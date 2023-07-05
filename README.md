@@ -1,2 +1,2 @@
 # SUB-COFI
-Study of Unfairness Bias in Collaborative Filtering Systems
+Study of Unfairness Bias in Collaborative Filtering
