@@ -17,19 +17,22 @@ print(f'Number of movies: {len(ratings["movie_id"].unique())}')
 ratings['rating'].plot.hist(bins=10, title='Histogram of All Ratings', logy=True)
 plt.xlabel('Rating')
 plt.ylabel('Frequency of rating')
-plt.savefig('hist_all_ratings.png')
+plt.savefig('figures/hist_all_ratings.png')
+plt.clf()
 
 # Histogram of the average rating per movie
 ratings.groupby('movie_id')['rating'].mean().plot.hist(bins=50, title='Histogram of Average Movie Ratings',  logy=True)
 plt.xlabel('Average Rating')
 plt.ylabel('# of movies')
-plt.savefig('hist_avg_movie_ratings.png')
+plt.savefig('figures/hist_avg_movie_ratings.png')
+plt.clf()
 
 # Histogram of the average rating per user
 ratings.groupby('user_id')['rating'].mean().plot.hist(bins=50, title='Histogram of Average User Ratings',  logy=True)
 plt.xlabel('Average Rating')
 plt.ylabel('# of users')
-plt.savefig('hist_avg_user_ratings.png')
+plt.savefig('figures/hist_avg_user_ratings.png')
+plt.clf()
 
 # Heatmap of the ratings depending on the user and movie average ratings
 user_avg_ratings = ratings.groupby('user_id')['rating'].mean()
@@ -72,4 +75,5 @@ plt.title('Heatmap of frequency of ratings based on user\' and movie\'s average 
 colorbar = plt.gcf().axes[-1]
 colorbar.set_yticklabels([f'$10^{int(tick)}$' for tick in colorbar.get_yticks()])
 
-plt.savefig('heatmap_user_movie_avg_ratings.png')
+plt.savefig('figures/heatmap_user_movie_avg_ratings.png')
+plt.clf()
