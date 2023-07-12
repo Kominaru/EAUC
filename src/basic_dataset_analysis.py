@@ -65,8 +65,8 @@ tick_labels = np.arange(0, 5.5, 0.5)
 # Create the heatmap using seaborn
 plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
 sns.heatmap(pivot_table.iloc[::-1], cmap='YlGnBu', annot=False, cbar_kws={'label': 'Logarithmic Frequency'}, fmt='g')
-plt.xticks(tick_labels*5, tick_labels, rotation='vertical')
-plt.yticks((tick_labels*5), tick_labels[::-1])
+plt.xticks(tick_labels*2, tick_labels, rotation='vertical')
+plt.yticks((tick_labels*2), tick_labels[::-1])
 plt.xlabel('Movie\'s Average Rating')
 plt.ylabel('User\'s Average Rating')
 plt.title('Heatmap of frequency of ratings based on user\' and movie\'s average ratings')
