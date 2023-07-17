@@ -32,3 +32,21 @@ Study of Unfairness Bias in Collaborative Filtering
   - b) **Top-N recommendation**: Given a user, recommend the top-N movies that the user would like the most.
     - Labels of the ratings are 0 or 1 (binary classification). We consider a movie to be liked by a user (1) if the rating is greater than or equal to 4.0. Otherwise, the label is not kept. **(?)**
     - Evaluation metrics: Precision, Recall, F1, NDCG, AUC
+
+## **Model Execution and Evaluation**
+### **MovieLens 10M**
+
+- Progress status codes: 
+  - 🚦 Not started
+  - 🕑 Running
+  - 🏁 Completed execution
+  - 🗻 Analysis finished
+  - ⚠️ Execution problem (solution in progress)
+  - 🔗‍💥 Code not available
+
+| **Model  (click for results)** | **Progress** | **RMSE (Reported)** | **RMSE (Reproduced)** | **Source Code** | **Paper** | **Comments** |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Sparse FC | 🕑 | 0.769 |  |  [Link](https://proceedings.mlr.press/v80/muller18a.html) | [Supplementary zip](https://proceedings.mlr.press/v80/muller18a.html) |
+| MRMA | 🚦 |  |  |  |  |  |
+| Bayesian time SVD++ Flipped | 🚦 |  |  |  |  |  |
+|  |  |  |  |  |  |  |
