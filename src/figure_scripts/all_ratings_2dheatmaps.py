@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-def all_ratings_2dheatmap(train_samples : pd.DataFrame, test_samples: pd.DataFrame, MODEL_NAME: str, bin_interval: int = 0.5, ) -> None:
+def all_ratings_2dheatmap(train_samples : pd.DataFrame, test_samples: pd.DataFrame, MODEL_NAME: str, bin_interval: int = 0.5) -> None:
 
     # Calculate the average rating per user and movie in the train set
     user_avg_ratings = train_samples.groupby('user_id')['rating'].mean()
@@ -15,7 +15,7 @@ def all_ratings_2dheatmap(train_samples : pd.DataFrame, test_samples: pd.DataFra
     test_samples['user_avg_rating'] = test_samples['user_id'].map(user_avg_ratings)
     test_samples['movie_avg_rating'] = test_samples['movie_id'].map(movie_avg_ratings)
 
-    bins = np.arange(0, 5 + bin_interval, bin_interval)
+    bins = np.arange(test_samples['rating'].min(), 5 + bin_interval, bin_interval)
 
     # Bin the average ratings into bins with the specified bin_interval
     train_samples['user_bin'] = pd.cut(train_samples['user_avg_rating'], bins=bins, include_lowest=True)
@@ -59,8 +59,11 @@ def all_ratings_2dheatmap(train_samples : pd.DataFrame, test_samples: pd.DataFra
     # Flip on the y-axis to have (0,0) in the bottom left corner
     ax1.invert_yaxis()
 
-    # Green color for the lowest RMSE, red color for the highest RMSE
-    sns.heatmap(pivot_table_rmse, cmap='RdYlGn', ax=ax2, cbar_kws={'label': 'RMSE'})
+    # Reverse RdYlGn colormap to have green for the lowest RMSE and red for the highest RMSE
+    cmap = sns.color_palette("RdYlGn", as_cmap=True)
+    cmap = cmap.reversed()
+
+    sns.heatmap(pivot_table_rmse, cmap=cmap, ax=ax2, cbar_kws={'label': 'RMSE'})
     ax2.set_xlabel('Average rating per movie')
     ax2.set_ylabel('Average rating per user')
     ax2.set_title('Heatmap of the RMSE of the predictions\n per user and movie average ratings (test set)')
