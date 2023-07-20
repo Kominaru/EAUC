@@ -47,6 +47,6 @@ Study of Unfairness Bias in Collaborative Filtering
 | **Model  (click for results)** | **Progress** | **RMSE (Reported)** | **RMSE (Reproduced)** | **Source Code** | **Paper** | **Comments** |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | Sparse FC | 🏁 | 0.769 | 0,770 |  [Link](https://proceedings.mlr.press/v80/muller18a.html) | [Supplementary zip](https://proceedings.mlr.press/v80/muller18a.html) |
-| MRMA | 🚦 |  |  |  |  |  |
+| MRMA | 🕑 |  |  |  |  |  |
 | Bayesian time SVD++ Flipped | 🚦 |  |  |  |  |  |
 |  |  |  |  |  |  |  |
