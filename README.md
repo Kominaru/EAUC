@@ -6,7 +6,7 @@ Study of Unfairness Bias in Collaborative Filtering
 ### **MovieLens 10M**
 
 - Download the dataset from [here](https://grouplens.org/datasets/movielens/10m/).
-- **Basic statistics of the MovieLens 10M dataset**:
+- **Basic statistics of the MovieLens 1M dataset**:
   - Unique users: 69878
   - Unique movies: 10677
   - Total ratings: 10000054
@@ -46,7 +46,7 @@ Study of Unfairness Bias in Collaborative Filtering
 
 | **Model  (click for results)** | **Progress** | **RMSE (Reported)** | **RMSE (Reproduced)** | **Source Code** | **Paper** | **Comments** |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Sparse FC | 🏁 | 0.769 | 0,770 |  [Link](https://proceedings.mlr.press/v80/muller18a.html) | [Supplementary zip](https://proceedings.mlr.press/v80/muller18a.html) |
-| MRMA | 🕑 |  |  |  |  |  |
-| Bayesian time SVD++ Flipped | 🚦 |  |  |  |  |  |
+| MRMA | 🗻 |  |  |  |  |
+| MF | 🗻 |  |  |  |  |  |
+| GLOCAL_K | 🗻 |  |  |  |  |  |
 |  |  |  |  |  |  |  |

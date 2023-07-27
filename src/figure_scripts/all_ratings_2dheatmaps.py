@@ -31,7 +31,7 @@ def all_ratings_2dheatmap(train_samples : pd.DataFrame, test_samples: pd.DataFra
     
 
     # Compute the RMSE in each (user average rating, movie average rating) bin
-    test_samples['error'] = test_samples['rating'] - test_samples['prediction']
+    test_samples['error'] = test_samples['rating'] - test_samples['pred']
     rmse_table = test_samples.groupby(['user_bin', 'movie_bin'])['error'].apply(lambda x: np.sqrt(np.mean(x**2))).reset_index(name='rmse')
 
     # Set to NaN the log_frequency and RMSE of the bins that have no samples in the train set

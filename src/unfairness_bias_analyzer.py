@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
-MODEL_NAME = 'GLOCAL_K'
+MODEL_NAME = 'MF'
 
 train_samples: pd.DataFrame = pd.read_csv(f'outputs/{MODEL_NAME}/train_samples.csv')
 test_samples: pd.DataFrame = pd.read_csv(f'outputs/{MODEL_NAME}/test_samples_with_predictions.csv')
@@ -15,11 +15,28 @@ print(f'Number of ratings: {len(all_samples)}')
 print(f'Number of users: {len(all_samples["user_id"].unique())}')
 print(f'Number of movies: {len(all_samples["movie_id"].unique())}')
 
+# Maximum and mininum ratings
+print(f'Maximum rating: {all_samples["rating"].max()}')
+print(f'Minimum rating: {all_samples["rating"].min()}')
+
+# Maximum and mininum predictions
+print(f'Maximum prediction: {all_samples["pred"].max()}')
+print(f'Minimum prediction: {all_samples["pred"].min()}')
+
 # How many users are in the test set but not in the training set?
 print(f'Number of users in test set but not in training set: {len(test_samples[~test_samples["user_id"].isin(train_samples["user_id"])])}')
 
+train_tuples = train_samples[['user_id', 'movie_id']].apply(tuple, axis=1)
+test_tuples = test_samples[['user_id', 'movie_id']].apply(tuple, axis=1)
+
+print('Repeated samples: ', test_tuples.isin(train_tuples).sum())
+
+# Clamp predictions to the range [1, 5]
+test_samples['pred'] = test_samples['pred'].clip(1, 5)
+
+
 # Brief check of the RMSE to ensure we're reproducing the results from the paper
-print("Test RMSE: ", np.sqrt(np.mean((test_samples['rating'] - test_samples['prediction'])**2)))
+print("Test RMSE: ", np.sqrt(np.mean((test_samples['rating'] - test_samples['pred'])**2)))
 
 # Create directory for figures
 import os
@@ -43,6 +60,7 @@ plot_2heatmaps_grid_by_unique_ratings(train_samples.copy(), test_samples.copy(),
 
 from figure_scripts.ratings_preds_heatmaps_by_avgratings import plot_ratings_vs_preds_2dheatmaps_grid
 plot_ratings_vs_preds_2dheatmaps_grid(train_samples.copy(), test_samples.copy(), MODEL_NAME, preds_bin_interval=0.5, avgs_bin_interval=.5)
+plot_ratings_vs_preds_2dheatmaps_grid(train_samples.copy(), train_samples.copy(), MODEL_NAME, preds_bin_interval=0.5, avgs_bin_interval=.5)
 
 
 

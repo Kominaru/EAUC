@@ -1,0 +1,11 @@
+# RANKS = list(range(10, 310, 10))
+# RANKS = list(range(10, 100, 10))
+RANKS = [10, 20, 50, 100, 150, 200, 250, 300]
+
+LEARNING_RATE_ALPHA = 1e-3
+LEARNING_RATE_BETA = 1e-3
+
+N_ITER = 100000
+N_EARLY_STOP_ITER = 20
+
+T = 300

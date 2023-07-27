@@ -32,7 +32,7 @@ def plot_2heatmaps_grid_by_unique_ratings(train_samples: pd.DataFrame, test_samp
     train_samples['user_bin'] = pd.cut(train_samples['user_avg_rating'], bins=bins, include_lowest=True)
     train_samples['movie_bin'] = pd.cut(train_samples['movie_avg_rating'], bins=bins, include_lowest=True)
 
-    test_samples['error'] = test_samples['rating'] - test_samples['prediction']
+    test_samples['error'] = test_samples['rating'] - test_samples['pred']
 
     for i, rating in enumerate(ratings):
 

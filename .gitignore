@@ -160,12 +160,13 @@ cython_debug/
 #.idea/
 
 *.dat
-figures/GLOCAL_K/hist_all_ratings.png
-figures/GLOCAL_K/hist_avg_movie_ratings.png
-figures/GLOCAL_K/hist_avg_user_ratings.png
-figures/GLOCAL_K/ratings_distribution_heatmap.png
-figures/GLOCAL_K/ratings_vs_predictions_heatmap.png
-figures/GLOCAL_K/rmse_heatmap.png
-ml-1m/README
-venv36
+venv*/
+checkpoints/
+logs/
+runs/
+*.csv
 outputs
+data
+models/MRMA/pmf/weights
+*.exe
+**/requirements.txt
