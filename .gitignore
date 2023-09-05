@@ -170,3 +170,4 @@ data
 models/MRMA/pmf/weights
 *.exe
 **/requirements.txt
+.vscode/settings.json

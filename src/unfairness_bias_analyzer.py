@@ -1,66 +1,173 @@
 # Path: unfairness_bias_analyzer.py
 import pandas as pd
-import matplotlib.pyplot as plt
 import numpy as np
-import seaborn as sns
 
-MODEL_NAME = 'MF'
-
-train_samples: pd.DataFrame = pd.read_csv(f'outputs/{MODEL_NAME}/train_samples.csv')
-test_samples: pd.DataFrame = pd.read_csv(f'outputs/{MODEL_NAME}/test_samples_with_predictions.csv')
-all_samples: pd.DataFrame = pd.concat([train_samples, test_samples])
-
-# Print number of ratings, number of users and number of movies
-print(f'Number of ratings: {len(all_samples)}')
-print(f'Number of users: {len(all_samples["user_id"].unique())}')
-print(f'Number of movies: {len(all_samples["movie_id"].unique())}')
-
-# Maximum and mininum ratings
-print(f'Maximum rating: {all_samples["rating"].max()}')
-print(f'Minimum rating: {all_samples["rating"].min()}')
-
-# Maximum and mininum predictions
-print(f'Maximum prediction: {all_samples["pred"].max()}')
-print(f'Minimum prediction: {all_samples["pred"].min()}')
-
-# How many users are in the test set but not in the training set?
-print(f'Number of users in test set but not in training set: {len(test_samples[~test_samples["user_id"].isin(train_samples["user_id"])])}')
-
-train_tuples = train_samples[['user_id', 'movie_id']].apply(tuple, axis=1)
-test_tuples = test_samples[['user_id', 'movie_id']].apply(tuple, axis=1)
-
-print('Repeated samples: ', test_tuples.isin(train_tuples).sum())
-
-# Clamp predictions to the range [1, 5]
-test_samples['pred'] = test_samples['pred'].clip(1, 5)
-
-
-# Brief check of the RMSE to ensure we're reproducing the results from the paper
-print("Test RMSE: ", np.sqrt(np.mean((test_samples['rating'] - test_samples['pred'])**2)))
-
-# Create directory for figures
-import os
-os.makedirs('figures/'+ MODEL_NAME + '/', exist_ok=True)
-
-from figure_scripts.basic_dataset_statistics import plot_basic_dataset_statistics_figures
-plot_basic_dataset_statistics_figures(all_samples.copy(), train_samples.copy(), MODEL_NAME)
-
+from figure_scripts.basic_dataset_statistics import plot_dataset_statistics_figures
+from figure_scripts.heatmaps_avgrating import plot_ratings_vs_preds_2dheatmaps_grid
 from figure_scripts.all_ratings_2dheatmaps import all_ratings_2dheatmap
-all_ratings_2dheatmap(train_samples.copy(), test_samples.copy(), MODEL_NAME, bin_interval=0.5)
-
-# For each rating in the test set, plot a 2d plot of the rmse depending on the user and movie average ratings, and a 
-# 2d plot of the frequency of ratings depending on the user and movie average ratings
-# and organize the plots in a grid
-
 from figure_scripts.rating_preds_conf_matrix import plot_2dheatmap_ratings_vs_preds
-plot_2dheatmap_ratings_vs_preds(test_samples.copy(), MODEL_NAME, preds_bin_interval=0.25)
-
 from figure_scripts.heatmaps_grid_by_rating import plot_2heatmaps_grid_by_unique_ratings
-plot_2heatmaps_grid_by_unique_ratings(train_samples.copy(), test_samples.copy(), MODEL_NAME, bin_interval=0.5)
+import os
+import warnings
 
-from figure_scripts.ratings_preds_heatmaps_by_avgratings import plot_ratings_vs_preds_2dheatmaps_grid
-plot_ratings_vs_preds_2dheatmaps_grid(train_samples.copy(), test_samples.copy(), MODEL_NAME, preds_bin_interval=0.5, avgs_bin_interval=.5)
-plot_ratings_vs_preds_2dheatmaps_grid(train_samples.copy(), train_samples.copy(), MODEL_NAME, preds_bin_interval=0.5, avgs_bin_interval=.5)
+# Supress FixedFormatter FixedLocator warnings
+warnings.filterwarnings("ignore", category=UserWarning)
+
+MODEL_NAME = "MF"
 
 
+def print_basic_dataset_statistics(
+    train_samples: pd.DataFrame, test_samples: pd.DataFrame
+):
+    """
+    1) Prints basic statistics about the dataset:
+    - Number of ratings, users and movies
+    - Min and max ratings and predictions
+    - Number of users in the test set but not in the training set
+    - Number of train samples repeated in the test set
 
+    2) Plots the basic dataset statistics figures:
+    - Histogram of the ratings as a whole with logarithmic y-scale
+    - Histogram of the average rating per movie (train set)
+    - Histogram of the average rating per user (train set)
+
+    Parameters:
+        train_samples (pd.DataFrame): Train samples.
+        test_samples (pd.DataFrame): Test samples.
+    """
+
+    all_samples = pd.concat([train_samples, test_samples])
+    print("=====================================")
+    print("Basic dataset statistics:")
+    print("=====================================")
+
+    print(f"    #Ratings:\t\t\t\t{len(all_samples)}")
+    print(f'    #Users:\t\t\t\t{len(all_samples["user_id"].unique())}')
+    print(f'    #Movies:\t\t\t\t{len(all_samples["movie_id"].unique())}')
+
+    # Min and max ratings
+    min_rating, max_rating = all_samples["rating"].min(), all_samples["rating"].max()
+    min_pred, max_pred = all_samples["pred"].min(), all_samples["pred"].max()
+
+    print(f"    Min-max ratings:\t\t\t{min_rating:.1f} - {max_rating:.1f}")
+    print(f"    Min-max predictions:\t\t{min_pred:.1f} - {max_pred:.1f}")
+
+    # How many users are in the test set but not in the training set?
+    print(
+        f'    #Unseen test users:\t\t\t{len(test_samples[~test_samples["user_id"].isin(train_samples["user_id"])])}'
+    )
+
+    train_tuples = train_samples[["user_id", "movie_id"]].apply(tuple, axis=1)
+    test_tuples = test_samples[["user_id", "movie_id"]].apply(tuple, axis=1)
+
+    print(f"    #Repeated train-test samples:\t{test_tuples.isin(train_tuples).sum()}")
+
+    # Plot figures
+    plot_dataset_statistics_figures(
+        all_samples.copy(), train_samples.copy(), MODEL_NAME
+    )
+
+
+def compute_rmse(train_samples: pd.DataFrame, test_samples: pd.DataFrame):
+    """
+    Computes the RMSE on the train and test sets.
+
+    Parameters:
+        train_samples (pd.DataFrame): Train samples.
+        test_samples (pd.DataFrame): Test samples.
+
+    """
+    print("=====================================")
+    print("RMSE")
+    print("=====================================")
+
+    # Compute the RMSE on the train set
+    rmse = ((train_samples["rating"] - train_samples["pred"]) ** 2).mean() ** 0.5
+    print(f"    Train: {rmse:.3f}")
+
+    # Compute the RMSE on the test set
+    rmse = ((test_samples["rating"] - test_samples["pred"]) ** 2).mean() ** 0.5
+    print(f"    Test:  {rmse:.3f}")
+
+
+def plot_model_prediction_analysis(train_samples, test_samples):
+    """
+    Plots the figures for the model prediction analysis:
+    1. Heatmap of the frequency of the ratings depending on user and movie average ratings (train set)
+    2. Heatmap of the frequency of test samples depending on rating and prediction bins (test set)
+    3. Heatmap of the RMSE depending on user and movie average ratings (train set) separated by unique ratings
+    4. Heatmap of the frequency of test samples depending on rating and prediction bins (test set)
+       separated by the user and movie average ratings (train set)
+
+    Parameters:
+        train_samples (pd.DataFrame): Train samples.
+        test_samples (pd.DataFrame): Test samples.
+    """
+
+    print("=====================================")
+    print("Model prediction bias analysis plots")
+    print("=====================================")
+    print(
+        "1) Heatmap of the frequency of the ratings depending on user and movie average ratings (train set)"
+    )
+    all_ratings_2dheatmap(
+        train_samples.copy(), test_samples.copy(), MODEL_NAME, bin_interval=0.5
+    )
+
+    print(
+        "2) Heatmap of the frequency of test samples depending on rating and prediction bins (test set)"
+    )
+    plot_2dheatmap_ratings_vs_preds(
+        test_samples.copy(), MODEL_NAME, preds_bin_interval=0.25
+    )
+
+    print(
+        "3) Heatmap of the RMSE depending on user and movie average ratings (train set) separated by unique ratings"
+    )
+    plot_2heatmaps_grid_by_unique_ratings(
+        train_samples.copy(), test_samples.copy(), MODEL_NAME, bin_interval=0.5
+    )
+
+    print(
+        "4) Heatmap of the frequency of test samples depending on rating and prediction bins (test set) separated by the user and movie average ratings (train set)"
+    )
+    plot_ratings_vs_preds_2dheatmaps_grid(
+        train_samples.copy(),
+        test_samples.copy(),
+        MODEL_NAME,
+        preds_bin_interval=0.5,
+        avgs_bin_interval=0.5,
+    )
+
+    plot_ratings_vs_preds_2dheatmaps_grid(
+        train_samples.copy(),
+        train_samples.copy(),
+        MODEL_NAME,
+        preds_bin_interval=0.5,
+        avgs_bin_interval=0.5,
+    )
+
+
+if __name__ == "__main__":
+    # Load train and test samples
+    train_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/train_samples.csv")
+    test_samples: pd.DataFrame = pd.read_csv(
+        f"outputs/{MODEL_NAME}/test_samples_with_predictions.csv"
+    )
+
+    # Print basic dataset statistics
+    print_basic_dataset_statistics(train_samples, test_samples)
+
+    # Clamp predictions to [1.0, 5.0]
+    test_samples["pred"] = np.clip(test_samples["pred"], 1.0, 5.0)
+    train_samples["pred"] = np.clip(train_samples["pred"], 1.0, 5.0)
+
+    # Brief check of the RMSE to ensure we're reproducing the results from the paper
+
+    compute_rmse(train_samples, test_samples)
+
+    # Create directory for figures
+    os.makedirs("figures/" + MODEL_NAME + "/", exist_ok=True)
+
+    # Plot figures for the model predictions bias analysis
+    plot_model_prediction_analysis(train_samples, test_samples)
