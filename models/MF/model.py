@@ -11,7 +11,7 @@ class CollaborativeFilteringModel(LightningModule):
         r_hat = dot(user_embedding, movie_embedding) + user_bias + movie_bias + global_bias
     
     '''
-    def __init__(self, num_users, num_movies, embedding_dim, lr=5e-4, l2_reg=1e-5):
+    def __init__(self, num_users, num_movies, embedding_dim = 100, lr=5e-4, l2_reg=1e-5):
         super().__init__()
         self.user_embedding = nn.Embedding(num_users, embedding_dim)
         self.movie_embedding = nn.Embedding(num_movies, embedding_dim)
