@@ -11,7 +11,18 @@ class CollaborativeFilteringModel(LightningModule):
         r_hat = dot(user_embedding, movie_embedding) + user_bias + movie_bias + global_bias
     
     '''
-    def __init__(self, num_users, num_movies, embedding_dim = 100, lr=5e-4, l2_reg=1e-5):
+    def __init__(self, num_users: int, num_movies: int, embedding_dim: int = 100, lr: float=5e-4, l2_reg: float = 1e-5):
+        '''
+        Initializes a Collaborative Filtering model for movie ratings prediction
+
+        Args:
+            num_users (int): Number of users in the dataset
+            num_movies (int): Number of movies in the dataset
+            embedding_dim (int): Embedding size for user and movie
+            lr (float): Learning rate
+            l2_reg (float): L2 regularization coefficient
+
+        '''
         super().__init__()
         self.user_embedding = nn.Embedding(num_users, embedding_dim)
         self.movie_embedding = nn.Embedding(num_movies, embedding_dim)
@@ -32,10 +43,8 @@ class CollaborativeFilteringModel(LightningModule):
         nn.init.zeros_(self.user_bias.weight)
         nn.init.zeros_(self.movie_bias.weight)
 
-        # Metrics
         self.rmse = torchmetrics.MeanSquaredError(squared=False)
 
-        # Clip the ratings between 1.0 and 5.0 for predictions
         self.clamp_ratings = lambda x: torch.clamp(x, min=1.0, max=5.0)
 
         # Save hyperparameters
@@ -43,16 +52,16 @@ class CollaborativeFilteringModel(LightningModule):
         
 
     def forward(self, user_ids, movie_ids):
-
+        
         user_embeds = self.user_embedding(user_ids)
         movie_embeds = self.movie_embedding(movie_ids)
 
         dot_product = torch.sum(user_embeds * movie_embeds, dim=1, keepdim=True)
 
-        user_bias = self.user_bias(user_ids)
+        user_bias = self.user_bias(user_ids) 
         movie_bias = self.movie_bias(movie_ids)
 
-        prediction = dot_product + user_bias + movie_bias + self.global_bias
+        prediction = dot_product + user_bias + movie_bias + self.global_bias # We add the user and movie biases and the global bias
 
         return prediction
 
@@ -61,9 +70,9 @@ class CollaborativeFilteringModel(LightningModule):
         rating_pred = self(user_ids, movie_ids).squeeze()
 
         # Compute Mean Squared Error (MSE) loss
+        # Notice we do not clamp the ratings
         loss = nn.MSELoss()(rating_pred, ratings)
 
-        # Logging the loss value
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
 
         return loss
@@ -78,7 +87,6 @@ class CollaborativeFilteringModel(LightningModule):
         # Clamp the predicted ratings for RMSE computation
         rating_pred_clamped = self.clamp_ratings(rating_pred)
 
-        # Compute RMSE using torchmetrics
         self.rmse.update(rating_pred_clamped, ratings)
         self.log('rmse', self.rmse, on_step=False, on_epoch=True, prog_bar=True)
 
@@ -92,7 +100,7 @@ class CollaborativeFilteringModel(LightningModule):
         return rating_pred_clamped
 
     def configure_optimizers(self):
-        # AdamW optimizer
+
         optimizer = optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.l2_reg)
         
         return optimizer
