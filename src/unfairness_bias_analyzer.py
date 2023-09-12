@@ -15,6 +15,8 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 MODEL_NAME = "MF"
 
+os.makedirs(f"figures/{MODEL_NAME}/", exist_ok=True)
+
 
 def print_basic_dataset_statistics(
     train_samples: pd.DataFrame, test_samples: pd.DataFrame
