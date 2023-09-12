@@ -41,7 +41,7 @@ def plot_2heatmaps_grid_by_unique_ratings(train_samples: pd.DataFrame, test_samp
         # Create the plot for the RMSE. Green means low RMSE (good), Red means high RMSE (bad)
         rmse_table = test_samples[test_samples['rating'] == rating].groupby(['user_bin', 'movie_bin'])['error'].apply(lambda x: np.sqrt(np.mean(x**2))).reset_index(name='rmse')
         pivot_table = rmse_table.pivot(index='user_bin', columns='movie_bin', values='rmse')
-        sns.heatmap(pivot_table.iloc[::-1], cmap=cmap, annot=False, cbar_kws={'label': 'RMSE'}, fmt='g', ax=axs[i, 0], vmin=0, vmax=2)
+        sns.heatmap(pivot_table.iloc[::-1], cmap=cmap, annot=False, cbar_kws={'label': 'RMSE'}, fmt='g', ax=axs[i, 0], vmin=0, vmax=4)
         axs[i, 0].set_ylabel('User\'s Average Rating')
         axs[i, 0].set_title(f'RMSE for rating {rating}')
 

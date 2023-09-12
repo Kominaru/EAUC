@@ -25,7 +25,7 @@ def train_MF_movielens():
 
     # Initialize the collaborative filtering model
     model = CollaborativeFilteringModel(
-        data_module.num_users, data_module.num_movies, embedding_dim
+        data_module.num_users, data_module.num_movies, EMBEDDING_DIM
     )
 
     # Initialize early stopping callback

@@ -1,5 +1,3 @@
-import math
-from matplotlib.colors import LogNorm
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,7 +7,6 @@ import seaborn as sns
 ratings = pd.read_csv('ratings.dat', sep='::', names=['user_id', 'movie_id', 'rating', 'timestamp'], engine='python')
 
 # Print number of ratings, number of users and number of movies with
-print(f'Number of ratings: {len(ratings)}')
 print(f'Number of users: {len(ratings["user_id"].unique())}')
 print(f'Number of movies: {len(ratings["movie_id"].unique())}')
 

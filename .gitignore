@@ -173,3 +173,4 @@ models/MRMA/pmf/weights
 *.exe
 **/requirements.txt
 .vscode/settings.json
+**/lightning_logs/

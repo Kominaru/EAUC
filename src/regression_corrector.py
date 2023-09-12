@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import mean_squared_error
 
 MODEL_NAME = "MF"
 
@@ -9,6 +10,15 @@ train_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/train_samples.c
 test_samples: pd.DataFrame = pd.read_csv(
     f"outputs/{MODEL_NAME}/test_samples_with_predictions.csv"
 )
+
+# Print basic dataset statistics
+all_samples = pd.concat([train_samples, test_samples])
+
+print(f"Number of ratings: {len(all_samples)}")
+print(f"Number of users: {len(all_samples['user_id'].unique())}")
+print(f"Number of movies: {len(all_samples['movie_id'].unique())}")
+
+
 
 
 def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts_dict):
@@ -28,6 +38,13 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
         # error = pow(samples["rating"] - predicts, 2)  # for RMSE
 
         samples["model_error"] = error
+
+        # Get the RMSE for all samples where the distance is larger than min_dist
+        filtered_samples = samples[samples["dist_avg_to_rating"] >= 1]
+        rmse = np.sqrt(
+            pow(filtered_samples['model_error'],2).mean()
+        )
+        print(f"RMSE for {model_name} in samples with dist > 1: {rmse:.3f}")
 
         # Compute the RMSE and std error for each bin
         bin_errors = (
@@ -96,6 +113,8 @@ test_samples["movie_avg_rating"] = test_samples["movie_id"].map(movie_avg_rating
 
 
 def filter_by_avg_rating(samples, user_avg_rating_range, movie_avg_rating_range):
+    # Warning, if a movie or user has no ratings in the train set, it will be filtered out
+    # as an implicit filter by the user/movie average rating range
     return samples[
         (samples["user_avg_rating"] >= user_avg_rating_range[0])
         & (samples["user_avg_rating"] <= user_avg_rating_range[1])
@@ -105,11 +124,15 @@ def filter_by_avg_rating(samples, user_avg_rating_range, movie_avg_rating_range)
 
 
 train_samples_selection = filter_by_avg_rating(
-    train_samples, user_avg_rating_range=[0, 5], movie_avg_rating_range=[1, 5]
+    train_samples, user_avg_rating_range=[0, 5], movie_avg_rating_range=[0, 5]
 )
 test_samples_selection = filter_by_avg_rating(
     test_samples, user_avg_rating_range=[0, 5], movie_avg_rating_range=[0, 5]
 )
+
+print(f"Number of train samples: {len(train_samples_selection)}")
+print(f"Number of test samples: {len(test_samples_selection)}")
+print(f"Total number of samples: {len(train_samples_selection) + len(test_samples_selection)}")
 
 # Make regression of the predictions on the ratings for the train samples, using linear and polynomial (degree 2) regression
 from sklearn.linear_model import LinearRegression
