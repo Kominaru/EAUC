@@ -37,7 +37,8 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
         samples["dist_avg_to_rating"], bins=np.arange(-5, 5, 0.25)
     )
 
-    models_errors = {}
+    models_errors_dists = {}
+    models_errors_bins = {}
 
     plt.figure(figsize=(7, 7))
 
@@ -46,28 +47,20 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
         samples["model_error"] = abs(samples["rating"] - predicts)
 
         ################
-        # 1) For Plot A
+        # 1) Data for Plot A
 
-        bin_errors = ( 
+        models_errors_bins[model_name] = []
+
+        models_errors_bins[model_name] = ( 
             samples.groupby("dist_avg_to_rating_bin")["model_error"] # Compute the error for each bin
             .agg(["mean", "std"])
             .reset_index()
         )
 
-        xx = bin_errors["dist_avg_to_rating_bin"].apply(lambda x: x.mid) # bin midpoints as x values for the plot
-
-        plt.plot(xx, bin_errors["mean"], linewidth=2, label=model_name) # Plot MAE per bin
-        plt.fill_between( # Fill std AE area for each bin
-            xx,
-            bin_errors["mean"] - bin_errors["std"],
-            bin_errors["mean"] + bin_errors["std"],
-            alpha=0.2,
-        )
-
         ################
         # 2) For Plot B
 
-        models_errors[model_name] = []
+        models_errors_dists[model_name] = []
 
         for min_dist in np.arange(0, 4.5, 0.1): # Compute the error for ratings with distance to avg >= min_dist
             filtered_samples = samples[samples["dist_avg_to_rating"] >= min_dist]
@@ -75,7 +68,23 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
             mae = filtered_samples["model_error"].mean()
             std = filtered_samples["model_error"].std()
 
-            models_errors[model_name].append((mae, std))
+            models_errors_dists[model_name].append((mae, std))
+
+
+    ###############
+    # 1) Plot A)
+
+    xx = models_errors_bins.items()[0][0]["dist_avg_to_rating_bin"].apply(lambda x: x.mid) # bin midpoints as x values for the plot
+    
+    for model_errors, model_name in models_errors_bins.items():
+        plt.plot(xx, model_errors["mean"], linewidth=2, label=model_name) # Plot MAE per bin
+        plt.fill_between( # Fill std AE area for each bin
+            xx,
+            model_errors["mean"] - model_errors["std"],
+            model_errors["mean"] + model_errors["std"],
+            alpha=0.2,
+        )
+
 
     plt.plot([-5, 5], [0, 0]) # Perfect regressor
 
@@ -98,10 +107,13 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
     plt.tight_layout()
     plt.show()
 
+
+    ################
+    # Plot B)
     # Plot the MAE for each model as a function of the min_dist
     plt.figure(figsize=(7, 7))
 
-    for model_name, errors in models_errors.items():
+    for model_name, errors in models_errors_dists.items():
         # Plot MAE and std error
         plt.plot(
             np.arange(0, 4.5, 0.1),
@@ -145,10 +157,6 @@ train_samples["movie_avg_rating"] = train_samples["movie_id"].map(movie_avg_rati
 test_samples["user_avg_rating"] = test_samples["user_id"].map(user_avg_ratings)
 test_samples["movie_avg_rating"] = test_samples["movie_id"].map(movie_avg_ratings)
 
-# Make a selection of the train and test samples: those from users and movies
-# with mean ratings in the range [4, 4.5]
-
-
 def filter_by_avg_rating(samples, user_avg_rating_range, movie_avg_rating_range):
     # Warning, if a movie or user has no ratings in the train set, it will be filtered out
     # as an implicit filter by the user/movie average rating range
@@ -160,126 +168,113 @@ def filter_by_avg_rating(samples, user_avg_rating_range, movie_avg_rating_range)
     ]
 
 
-train_samples_selection = filter_by_avg_rating(
+train_samples = filter_by_avg_rating(
     train_samples, user_avg_rating_range=[0, 5], movie_avg_rating_range=[0, 5]
 )
-test_samples_selection = filter_by_avg_rating(
+test_samples = filter_by_avg_rating(
     test_samples, user_avg_rating_range=[0, 5], movie_avg_rating_range=[0, 5]
 )
 
-print(f"Number of train samples: {len(train_samples_selection)}")
-print(f"Number of test samples: {len(test_samples_selection)}")
-print(f"Total number of samples: {len(train_samples_selection) + len(test_samples_selection)}")
 
-# Make regression of the predictions on the ratings for the train samples, using linear and polynomial (degree 2) regression
+#############################
+# Linear regression corrector
+#############################
+
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 
 lr = LinearRegression()
-
-# Linear regression: based on the prediction, the user and movie average ratings, predict the real rating
 lr.fit(
-    train_samples_selection[["rating", "user_avg_rating", "movie_avg_rating"]],
-    train_samples_selection["pred"],
+    train_samples[["rating", "user_avg_rating", "movie_avg_rating"]],
+    train_samples["pred"],
 )
 
 # Print the equation of the linear regression
 print(
-    f"Linear regression: pred = {lr.intercept_:.3f} + {lr.coef_[0]:.3f} * rating + {lr.coef_[1]:.3f} * user_avg_rating + {lr.coef_[2]:.3f} * movie_avg_rating"
+    f"""Linear equation: 
+            pred = {lr.intercept_:.3f} + {lr.coef_[0]:.3f} * rating + {lr.coef_[1]:.3f} * user_avg_rating + {lr.coef_[2]:.3f} * movie_avg_rating"""
 )
 
-
-# If the regression is pred = a + b * rating + c * user_avg_rating + d * movie_avg_rating,
-# then rating = (pred - a - c * user_avg_rating - d * movie_avg_rating) / b
 def correct_prediction(sample, lr):
-    return (
+    '''
+    Correct the prediction of a sample using the linear regression by solving the equation for rating.
+    If the linear regression is pred = a + b * rating + c * user_avg_rating + d * movie_avg_rating, then the corrected prediction is:  
+    rating = (pred - a - c * user_avg_rating - d * movie_avg_rating) / b
+
+    Params: 
+        sample: a row of the train or test samples dataframe. It must have the columns "rating", "user_avg_rating", "movie_avg_rating" and "pred"
+        lr: the linear regression model, with the equation pred = a + b * rating + c * user_avg_rating + d * movie_avg_rating
+    
+    Returns:
+        The corrected prediction (predicted rating) clipped to the range [1, 5]
+    '''
+    return ((
         sample["pred"]
         - lr.intercept_
         - lr.coef_[1] * sample["user_avg_rating"]
         - lr.coef_[2] * sample["movie_avg_rating"]
-    ) / lr.coef_[0]
+    ) / lr.coef_[0]).clip(1, 5) 
 
 
-train_samples_selection["pred_corrected"] = train_samples_selection.apply(
+train_samples["pred_corrected"] = train_samples.apply( # Apply the correction to all the train samples
     lambda x: correct_prediction(x, lr), axis=1
 )
-test_samples_selection["pred_corrected"] = test_samples_selection.apply(
+test_samples["pred_corrected"] = test_samples.apply( # Apply the correction to all the test samples
     lambda x: correct_prediction(x, lr), axis=1
 )
-
-# Clip the corrected predictions to the range [1, 5]
-train_samples_selection["pred_corrected"] = train_samples_selection[
-    "pred_corrected"
-].clip(1, 5)
-test_samples_selection["pred_corrected"] = test_samples_selection[
-    "pred_corrected"
-].clip(1, 5)
 
 print(
     "Train RMSE (uncorrected): ",
-    mean_squared_error(
-        train_samples_selection["rating"],
-        train_samples_selection["pred"],
-        squared=False,
-    ),
-)
+    mean_squared_error( train_samples["rating"], train_samples["pred"], squared=False)
+    )
 print(
     "Test RMSE (uncorrected): ",
-    mean_squared_error(
-        test_samples_selection["rating"], test_samples_selection["pred"], squared=False
-    ),
-)
+    mean_squared_error(test_samples["rating"], test_samples["pred"], squared=False)
+    )
 print(
     "Train RMSE (corrected): ",
-    mean_squared_error(
-        train_samples_selection["rating"],
-        train_samples_selection["pred_corrected"],
-        squared=False,
-    ),
-)
+    mean_squared_error( train_samples["rating"],train_samples["pred_corrected"],squared=False)
+    )
 print(
     "Test RMSE (corrected): ",
-    mean_squared_error(
-        test_samples_selection["rating"],
-        test_samples_selection["pred_corrected"],
-        squared=False,
-    ),
+    mean_squared_error(test_samples["rating"],test_samples["pred_corrected"],squared=False)
 )
 
-# Store the different predictions in a dictionary
+# Store the predictions of different models in a dict and plot them together
+
+#Train
 predicts_dict = {
-    "MF": train_samples_selection["pred"],
-    "MF_corrected": train_samples_selection["pred_corrected"],
-    "RND": np.random.uniform(1, 5, len(train_samples_selection)),
-}
-
-
-plot_error_distribution_by_difference_rating_to_avg_rating(
-    train_samples_selection, predicts_dict
-)
-
-predicts_dict = {
-    "MF": test_samples_selection["pred"],
-    "MF_corrected": test_samples_selection["pred_corrected"],
-    "RND": np.random.uniform(1, 5, len(test_samples_selection)),
+    "MF": train_samples["pred"],
+    "MF_corrected": train_samples["pred_corrected"],
+    "RND": np.random.uniform(1, 5, len(train_samples)),
 }
 
 plot_error_distribution_by_difference_rating_to_avg_rating(
-    test_samples_selection, predicts_dict
+    train_samples, predicts_dict
+)
+
+#Test
+predicts_dict = {
+    "MF": test_samples["pred"],
+    "MF_corrected": test_samples["pred_corrected"],
+    "RND": np.random.uniform(1, 5, len(test_samples)),
+}
+
+plot_error_distribution_by_difference_rating_to_avg_rating(
+    test_samples, predicts_dict
 )
 
 # Save the train and test samples with the corrected predictions. We overwrite the pred column with the corrected predictions
-train_samples_selection["pred"] = train_samples_selection["pred_corrected"]
-test_samples_selection["pred"] = test_samples_selection["pred_corrected"]
+train_samples["pred"] = train_samples["pred_corrected"]
+test_samples["pred"] = test_samples["pred_corrected"]
 
-# Save only the columns we need
 os.makedirs(f"outputs/{MODEL_NAME}_corrected", exist_ok=True)
 
-train_samples_selection[["user_id", "movie_id", "rating", "pred"]].to_csv(
+train_samples[["user_id", "movie_id", "rating", "pred"]].to_csv(
     f"outputs/{MODEL_NAME}_corrected/train_samples.csv", index=False
 )
 
-test_samples_selection[["user_id", "movie_id", "rating", "pred"]].to_csv(
+test_samples[["user_id", "movie_id", "rating", "pred"]].to_csv(
     f"outputs/{MODEL_NAME}_corrected/test_samples_with_predictions.csv", index=False
 )
 
