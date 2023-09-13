@@ -74,9 +74,11 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
     ###############
     # 1) Plot A)
 
-    xx = models_errors_bins.items()[0][0]["dist_avg_to_rating_bin"].apply(lambda x: x.mid) # bin midpoints as x values for the plot
     
-    for model_errors, model_name in models_errors_bins.items():
+    xx = models_errors_bins[MODEL_NAME]["dist_avg_to_rating_bin"].apply(lambda x: x.mid) # Use the midpoints of the bins as x values
+    
+    print(xx)
+    for model_name, model_errors in models_errors_bins.items():
         plt.plot(xx, model_errors["mean"], linewidth=2, label=model_name) # Plot MAE per bin
         plt.fill_between( # Fill std AE area for each bin
             xx,
