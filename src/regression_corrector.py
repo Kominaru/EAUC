@@ -22,6 +22,9 @@ print(f"Number of movies: {len(all_samples['movie_id'].unique())}")
 
 
 def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts_dict):
+
+    samples = samples.copy()
+    
     samples["dist_avg_to_rating"] = (
         samples["user_avg_rating"] + samples["movie_avg_rating"]
     ) / 2 - samples["rating"]
@@ -29,6 +32,8 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
     samples["dist_avg_to_rating_bin"] = pd.cut(
         samples["dist_avg_to_rating"], bins=np.arange(-5, 5, 0.25)
     )
+
+    models_errors = {}
 
     plt.figure(figsize=(7, 7))
 
@@ -39,12 +44,19 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
 
         samples["model_error"] = error
 
-        # Get the RMSE for all samples where the distance is larger than min_dist
-        filtered_samples = samples[samples["dist_avg_to_rating"] >= 1]
-        rmse = np.sqrt(
-            pow(filtered_samples['model_error'],2).mean()
-        )
-        print(f"RMSE for {model_name} in samples with dist > 1: {rmse:.3f}")
+        # Get the MAE for all samples where the distance is larger than min_dist
+        # for min_dist in [0, 0.5, 1, 1.5, 2, ..., 5]:
+
+        models_errors[model_name] = []
+
+        for min_dist in np.arange(0, 4.5, 0.1):
+            filtered_samples = samples[samples["dist_avg_to_rating"] >= min_dist]
+            
+            # MAE and std error
+            mae = filtered_samples["model_error"].mean()
+            std = filtered_samples["model_error"].std()
+
+            models_errors[model_name].append((mae, std))
 
         # Compute the RMSE and std error for each bin
         bin_errors = (
@@ -95,6 +107,41 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+    # Plot the MAE for each model as a function of the min_dist
+    plt.figure(figsize=(7, 7))
+
+    for model_name, errors in models_errors.items():
+        # Plot MAE and std error
+        plt.plot(
+            np.arange(0, 4.5, 0.1),
+            [x[0] for x in errors],
+            linewidth=2,
+            label=model_name,
+        )
+        plt.fill_between(
+            np.arange(0, 4.5, 0.1),
+            [x[0] - x[1] for x in errors],
+            [x[0] + x[1] for x in errors],
+            alpha=0.2,
+        )
+
+
+    plt.xlabel("Min distance from sample rating to avg user rating")
+    plt.ylabel("RMSE")
+
+    plt.xlim([0, 4])
+    plt.ylim([0, 4])
+
+    plt.xticks(np.arange(0, 4.5, 0.5))
+    plt.yticks(np.arange(0, 4.5, 0.5))
+
+    plt.grid(which="major", axis="both", linestyle="-", linewidth=0.5)
+
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
 
 
 # Compute the average rating per user and per movie
@@ -219,6 +266,16 @@ predicts_dict = {
 
 plot_error_distribution_by_difference_rating_to_avg_rating(
     train_samples_selection, predicts_dict
+)
+
+predicts_dict = {
+    "MF": test_samples_selection["pred"],
+    "MF_corrected": test_samples_selection["pred_corrected"],
+    "RND": np.random.uniform(1, 5, len(test_samples_selection)),
+}
+
+plot_error_distribution_by_difference_rating_to_avg_rating(
+    test_samples_selection, predicts_dict
 )
 
 # Save the train and test samples with the corrected predictions. We overwrite the pred column with the corrected predictions
