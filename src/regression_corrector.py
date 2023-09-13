@@ -14,6 +14,10 @@ test_samples: pd.DataFrame = pd.read_csv(
 # Print basic dataset statistics
 all_samples = pd.concat([train_samples, test_samples])
 
+print(f"==============================")
+print(f"Dataset statistics")
+print(f"==============================")
+
 print(f"Number of ratings: {len(all_samples)}")
 print(f"Number of users: {len(all_samples['user_id'].unique())}")
 print(f"Number of movies: {len(all_samples['movie_id'].unique())}")
@@ -38,68 +42,54 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
     plt.figure(figsize=(7, 7))
 
     for model_name, predicts in predicts_dict.items():
-        # error = samples["rating"] - predicts  # for Mean Error
-        error = abs(samples["rating"] - predicts)  # for MAE
-        # error = pow(samples["rating"] - predicts, 2)  # for RMSE
 
-        samples["model_error"] = error
+        samples["model_error"] = abs(samples["rating"] - predicts)
 
-        # Get the MAE for all samples where the distance is larger than min_dist
-        # for min_dist in [0, 0.5, 1, 1.5, 2, ..., 5]:
+        ################
+        # 1) For Plot A
 
-        models_errors[model_name] = []
-
-        for min_dist in np.arange(0, 4.5, 0.1):
-            filtered_samples = samples[samples["dist_avg_to_rating"] >= min_dist]
-            
-            # MAE and std error
-            mae = filtered_samples["model_error"].mean()
-            std = filtered_samples["model_error"].std()
-
-            models_errors[model_name].append((mae, std))
-
-        # Compute the RMSE and std error for each bin
-        bin_errors = (
-            samples.groupby("dist_avg_to_rating_bin")["model_error"]
+        bin_errors = ( 
+            samples.groupby("dist_avg_to_rating_bin")["model_error"] # Compute the error for each bin
             .agg(["mean", "std"])
             .reset_index()
         )
 
-        # SQRT if RMSE
-        # bin_errors["mean"] = np.sqrt(bin_errors["mean"])
+        xx = bin_errors["dist_avg_to_rating_bin"].apply(lambda x: x.mid) # bin midpoints as x values for the plot
 
-        # Use the middle of the bin as the x coordinate
-        xx = bin_errors["dist_avg_to_rating_bin"].apply(lambda x: x.mid)
-
-        # Plot the errors for the model
-        plt.plot(xx, bin_errors["mean"], linewidth=2, label=model_name)
-        plt.fill_between(
+        plt.plot(xx, bin_errors["mean"], linewidth=2, label=model_name) # Plot MAE per bin
+        plt.fill_between( # Fill std AE area for each bin
             xx,
             bin_errors["mean"] - bin_errors["std"],
             bin_errors["mean"] + bin_errors["std"],
             alpha=0.2,
         )
 
-    # Plot the x=0 line (perfect regressor)
-    plt.plot([-5, 5], [0, 0])
+        ################
+        # 2) For Plot B
 
-    # Add grid every 0.5 x or y increment, but only add axis ticks every 1 increment
-    plt.grid(which="major", axis="both", linestyle="-", linewidth=0.5)
-    plt.grid(which="minor", axis="both", linestyle=":", linewidth=0.5)
+        models_errors[model_name] = []
 
-    # Configure minor ticks every 0.25
+        for min_dist in np.arange(0, 4.5, 0.1): # Compute the error for ratings with distance to avg >= min_dist
+            filtered_samples = samples[samples["dist_avg_to_rating"] >= min_dist]
+            
+            mae = filtered_samples["model_error"].mean()
+            std = filtered_samples["model_error"].std()
+
+            models_errors[model_name].append((mae, std))
+
+    plt.plot([-5, 5], [0, 0]) # Perfect regressor
+
+    plt.xlim([-5, 5])
+    plt.ylim([-5, 5])
+    plt.xticks(np.arange(-5, 5, 1))
+    plt.yticks(np.arange(-5, 5, 1))
     plt.minorticks_on()
     plt.gca().xaxis.set_minor_locator(plt.MultipleLocator(0.25))
     plt.gca().yaxis.set_minor_locator(plt.MultipleLocator(0.25))
 
-    # Set x and y limits
+    plt.grid(which="major", axis="both", linestyle="-", linewidth=0.5)
+    plt.grid(which="minor", axis="both", linestyle=":", linewidth=0.5)
 
-    plt.xlim([-5, 5])
-    plt.ylim([-5, 5])
-
-    # # Set x and y ticks every 0.5
-    plt.xticks(np.arange(-5, 5, 1))
-    plt.yticks(np.arange(-5, 5, 1))
 
     plt.xlabel("Avg(avgrating(user),avgrating(movie)) - rating")
     plt.ylabel("Prediction error")
