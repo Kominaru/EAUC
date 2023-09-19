@@ -10,14 +10,14 @@ MODEL_NAME = "MF"
 train_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/train_samples.csv")
 test_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/test_samples_with_predictions.csv")
 
-with pd.concat([train_samples, test_samples]) as all_samples:
-    print(f"==============================")
-    print(f"Dataset statistics")
-    print(f"==============================")
+all_samples = pd.concat([train_samples, test_samples])
 
-    print(f"Number of ratings: {len(all_samples)}")
-    print(f"Number of users: {all_samples['user_id'].nunique()}")
-    print(f"Number of movies: {all_samples['movie_id'].nunique()}")
+print(f"==============================")
+print(f"Dataset statistics")
+
+print(f"\t#Ratings: {len(all_samples)}")
+print(f"\t#Users:   {all_samples['user_id'].nunique()}")
+print(f"\t#Movies:  {all_samples['movie_id'].nunique()}")
 
 # Compute the average rating per user and per movie
 user_avg_ratings = train_samples.groupby("user_id")["rating"].mean()
@@ -50,8 +50,10 @@ lr = LinearRegression()
 lr.fit(train_samples[["rating", "user_avg_rating", "movie_avg_rating"]], train_samples["pred"])
 
 print(
-    f"""Linear equation: 
-            pred = {lr.intercept_:.3f} + {lr.coef_[0]:.3f} * rating + {lr.coef_[1]:.3f} * user_avg_rating + {lr.coef_[2]:.3f} * movie_avg_rating"""
+    f"""
+==============================
+Linear equation: 
+        pred = {lr.intercept_:.3f} + {lr.coef_[0]:.3f} * rating + {lr.coef_[1]:.3f} * user_avg_rating + {lr.coef_[2]:.3f} * movie_avg_rating"""
 )
 
 
@@ -93,6 +95,7 @@ os.makedirs(f"outputs/{MODEL_NAME}_correction_lr", exist_ok=True)
 train_samples.to_csv(f"outputs/{MODEL_NAME}_correction_lr/train_samples.csv", index=False)
 test_samples.to_csv(f"outputs/{MODEL_NAME}_correction_lr/test_samples_with_predictions.csv", index=False)
 
+print(f"==============================")
 print(f"Saved corrected Train predictions in outputs/{MODEL_NAME}_correction_lr/train_samples.csv")
 print(f"Saved corrected Test predictions in outputs/{MODEL_NAME}_correction_lr/test_samples_with_predictions.csv")
 

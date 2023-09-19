@@ -40,6 +40,10 @@ def compute_avg_bias_auc(
     test_samples["user_avg_rating"] = test_samples["user_id"].map(user_avg_ratings)
     test_samples["movie_avg_rating"] = test_samples["movie_id"].map(movie_avg_ratings)
 
+    # Filter out samples for which the user or movie average rating is not available
+    test_samples = test_samples[~test_samples["user_avg_rating"].isna()]
+    test_samples = test_samples[~test_samples["movie_avg_rating"].isna()]
+
     # Compute the rating-avg distances
     test_samples["user_rating_avg_dist"] = (
         test_samples["rating"]
