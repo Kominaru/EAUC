@@ -41,6 +41,54 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(
 
     plt.figure(figsize=(7, 7))
 
+    # Check the stability of the AUC metric depending on the number of bins
+
+    aucs = {}
+    bin_numbers = [1, 2, 5, 10, 25, 50, 100, 500, 1000, 10000, 100000, len(samples)]
+
+    for model_name, predicts in predicts_dict.items():
+        aucs[model_name] = []
+        samples_tmp = samples.copy()
+
+        samples_tmp["model_error"] = abs(samples_tmp["rating"] - predicts)
+
+        for bin_number in bin_numbers:
+            samples_tmp["dist_avg_to_rating_bin"] = pd.cut(
+                samples_tmp["dist_avg_to_rating"], bins=bin_number
+            )
+
+            # samples_tmp = (
+            #     samples_tmp.groupby("dist_avg_to_rating_bin")
+            #     .filter(lambda x: len(x) >= 10)
+            #     .reset_index(drop=True)
+            # )
+
+            samples_tmp_grp = samples_tmp.groupby("dist_avg_to_rating_bin")["model_error"].mean()
+
+            # Remove all nan bins
+            samples_tmp_grp = samples_tmp_grp.dropna()
+
+            # Use the mid point of the bin as the x value
+            xx = samples_tmp_grp.index.to_series().apply(lambda x: x.mid)
+            yy = samples_tmp_grp.values
+
+            auc = np.trapz(yy, xx)
+            aucs[model_name].append(auc)
+
+            print(f"{model_name} AUC (bins={bin_number}): {auc}")
+            
+
+    for model_name, auc in aucs.items():
+        plt.plot(bin_numbers, auc, label=model_name)
+
+    plt.xscale("log")
+    plt.xlabel("Number of bins")
+    plt.ylabel("AUC")
+    plt.legend()
+    plt.show()
+
+
+
     for model_name, predicts in predicts_dict.items():
         samples["model_error"] = abs(samples["rating"] - predicts)
 
@@ -80,6 +128,24 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(
 
             models_errors_dists[model_name].append((mae, std))
 
+        # Alterinative way of computing the area under the curve: 
+        # group by dist to avg and compute the area under the curve of the MAE
+
+        samples_tmp = samples_tmp.sort_values("dist_avg_to_rating")
+
+        xx = samples_tmp["dist_avg_to_rating"].values
+        yy = samples_tmp["model_error"].values
+
+        auc = np.trapz(yy, xx)
+        print(f"{model_name} AUC (ordered): {auc}")
+
+        # Alternative way 2: group by dist to avg and compute the area under the curve of the MAE
+        samples_tmp = samples_tmp.groupby("dist_avg_to_rating")["model_error"].mean()
+        xx = samples_tmp.index.values
+        yy = samples_tmp.values
+
+        auc = np.trapz(yy, xx)
+        print(f"{model_name} AUC (grouped): {auc}")
     ###############
     # 1) Plot A)
 
@@ -90,7 +156,7 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(
 
         # Find the area under the curve for the MAE of each model
         auc = np.trapz(model_errors["mean"], xx)
-        print(f"{model_name} AUC: {auc}")
+        print(f"{model_name} AUC (bins): {auc}")
 
         plt.plot(
             xx, model_errors["mean"], linewidth=2, label=model_name
