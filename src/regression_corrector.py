@@ -93,6 +93,9 @@ os.makedirs(f"outputs/{MODEL_NAME}_correction_lr", exist_ok=True)
 train_samples.to_csv(f"outputs/{MODEL_NAME}_correction_lr/train_samples.csv", index=False)
 test_samples.to_csv(f"outputs/{MODEL_NAME}_correction_lr/test_samples_with_predictions.csv", index=False)
 
+print(f"Saved corrected Train predictions in outputs/{MODEL_NAME}_correction_lr/train_samples.csv")
+print(f"Saved corrected Test predictions in outputs/{MODEL_NAME}_correction_lr/test_samples_with_predictions.csv")
+
 exit()
 
 
