@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.metrics import mean_squared_error
+from avg_bias_auc import compute_avg_bias_auc
 
 MODEL_NAME = "MF"
 
@@ -43,51 +44,11 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(
 
     # Check the stability of the AUC metric depending on the number of bins
 
-    aucs = {}
-    bin_numbers = [1, 2, 5, 10, 25, 50, 100, 500, 1000, 10000, 100000, len(samples)]
-
-    for model_name, predicts in predicts_dict.items():
-        aucs[model_name] = []
-        samples_tmp = samples.copy()
-
-        samples_tmp["model_error"] = abs(samples_tmp["rating"] - predicts)
-
-        for bin_number in bin_numbers:
-            samples_tmp["dist_avg_to_rating_bin"] = pd.cut(
-                samples_tmp["dist_avg_to_rating"], bins=bin_number
-            )
-
-            # samples_tmp = (
-            #     samples_tmp.groupby("dist_avg_to_rating_bin")
-            #     .filter(lambda x: len(x) >= 10)
-            #     .reset_index(drop=True)
-            # )
-
-            samples_tmp_grp = samples_tmp.groupby("dist_avg_to_rating_bin")["model_error"].mean()
-
-            # Remove all nan bins
-            samples_tmp_grp = samples_tmp_grp.dropna()
-
-            # Use the mid point of the bin as the x value
-            xx = samples_tmp_grp.index.to_series().apply(lambda x: x.mid)
-            yy = samples_tmp_grp.values
-
-            auc = np.trapz(yy, xx)
-            aucs[model_name].append(auc)
-
-            print(f"{model_name} AUC (bins={bin_number}): {auc}")
-            
-
-    for model_name, auc in aucs.items():
-        plt.plot(bin_numbers, auc, label=model_name)
-
     plt.xscale("log")
     plt.xlabel("Number of bins")
     plt.ylabel("AUC")
     plt.legend()
     plt.show()
-
-
 
     for model_name, predicts in predicts_dict.items():
         samples["model_error"] = abs(samples["rating"] - predicts)
@@ -128,24 +89,6 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(
 
             models_errors_dists[model_name].append((mae, std))
 
-        # Alterinative way of computing the area under the curve: 
-        # group by dist to avg and compute the area under the curve of the MAE
-
-        samples_tmp = samples_tmp.sort_values("dist_avg_to_rating")
-
-        xx = samples_tmp["dist_avg_to_rating"].values
-        yy = samples_tmp["model_error"].values
-
-        auc = np.trapz(yy, xx)
-        print(f"{model_name} AUC (ordered): {auc}")
-
-        # Alternative way 2: group by dist to avg and compute the area under the curve of the MAE
-        samples_tmp = samples_tmp.groupby("dist_avg_to_rating")["model_error"].mean()
-        xx = samples_tmp.index.values
-        yy = samples_tmp.values
-
-        auc = np.trapz(yy, xx)
-        print(f"{model_name} AUC (grouped): {auc}")
     ###############
     # 1) Plot A)
 
@@ -153,10 +96,6 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(
         # Filter NaNs
         model_errors = model_errors.dropna()
         xx = model_errors["dist_avg_to_rating_bin"].apply(lambda x: x.mid)
-
-        # Find the area under the curve for the MAE of each model
-        auc = np.trapz(model_errors["mean"], xx)
-        print(f"{model_name} AUC (bins): {auc}")
 
         plt.plot(
             xx, model_errors["mean"], linewidth=2, label=model_name
@@ -334,26 +273,83 @@ print(
 # Store the predictions of different models in a dict and plot them together
 
 # Train
-predicts_dict = {
+train_predicts_dict = {
     "MF": train_samples["pred"],
     "MF_corrected": train_samples["pred_corrected"],
     "RND": np.random.uniform(1, 5, len(train_samples)),
 }
 
-plot_error_distribution_by_difference_rating_to_avg_rating(
-    train_samples, predicts_dict, bins=20
-)
+# plot_error_distribution_by_difference_rating_to_avg_rating(
+#     train_samples, train_predicts_dict, bins=20
+# )
+
+for model_name, predicts in train_predicts_dict.items():
+    # Create a dataframe for this model with the ids, ratings and predictions
+    df = pd.DataFrame(
+        {
+            "user_id": train_samples["user_id"],
+            "movie_id": train_samples["movie_id"],
+            "rating": train_samples["rating"],
+            "pred": predicts,
+        }
+    )
+
+    # Compute the AVG-BIAS-AUC
+    avg_bias_auc = compute_avg_bias_auc(train_samples=df, method="ordered")
+    print(f"Train AVG-BIAS-AUC ({model_name}) (ordered): {avg_bias_auc:.3f}")
+
+    avg_bias_auc = compute_avg_bias_auc(train_samples=df, method="bins", bins=100)
+    print(f"Train AVG-BIAS-AUC ({model_name}) (100 bins): {avg_bias_auc:.3f}")
+
+    avg_bias_auc = compute_avg_bias_auc(train_samples=df, method="grouped")
+    print(f"Train AVG-BIAS-AUC ({model_name}) (grouped): {avg_bias_auc:.3f}")
+
 
 # Test
-predicts_dict = {
+test_predicts_dict = {
     "MF": test_samples["pred"],
     "MF_corrected": test_samples["pred_corrected"],
     "RND": np.random.uniform(1, 5, len(test_samples)),
 }
 
-plot_error_distribution_by_difference_rating_to_avg_rating(
-    test_samples, predicts_dict, bins=20
-)
+for model_name, predicts in test_predicts_dict.items():
+    # Create a dataframe for this model with the ids, ratings and predictions
+    df = pd.DataFrame(
+        {
+            "user_id": train_samples["user_id"],
+            "movie_id": train_samples["movie_id"],
+            "rating": train_samples["rating"],
+        }
+    )
+
+    test_df = pd.DataFrame(
+        {
+            "user_id": test_samples["user_id"],
+            "movie_id": test_samples["movie_id"],
+            "rating": test_samples["rating"],
+            "pred": predicts,
+        }
+    )
+    # Compute the AVG-BIAS-AUC
+    avg_bias_auc = compute_avg_bias_auc(
+        train_samples=df, test_samples=test_df, method="ordered"
+    )
+    print(f"Train AVG-BIAS-AUC ({model_name}) (ordered): {avg_bias_auc:.3f}")
+
+    avg_bias_auc = compute_avg_bias_auc(
+        train_samples=df, test_samples=test_df, method="bins", bins=100
+    )
+    print(f"Train AVG-BIAS-AUC ({model_name}) (100 bins): {avg_bias_auc:.3f}")
+
+    avg_bias_auc = compute_avg_bias_auc(
+        train_samples=df, test_samples=test_df, method="grouped"
+    )
+    print(f"Train AVG-BIAS-AUC ({model_name}) (grouped): {avg_bias_auc:.3f}")
+
+
+# plot_error_distribution_by_difference_rating_to_avg_rating(
+#     test_samples, predicts_dict, bins=20
+# )
 
 # Save the train and test samples with the corrected predictions. We overwrite the pred column with the corrected predictions
 train_samples["pred"] = train_samples["pred_corrected"]
