@@ -48,6 +48,8 @@ def plot_avg_bias_error(train_samples_dict: dict, test_samples_dict: dict = None
             pd.cut(test_samples["dist_to_avg_rating"], bins)
         )["error"].mean()
 
+        errors_by_dist = errors_by_dist[~errors_by_dist.isna()]
+
         xx = errors_by_dist.index.to_series().apply(lambda x: x.mid)
         yy = errors_by_dist.values
 
@@ -101,8 +103,8 @@ if __name__ == '__main__':
 
 
     # Plot the train error by distance to the average rating for each model
-    plot_avg_bias_error({model: model_predictions[model]['train'] for model in models}, bins=100)
+    plot_avg_bias_error({model: model_predictions[model]['train'] for model in models}, bins=25)
 
     # Plot the test error by distance to the average rating for each model
     plot_avg_bias_error({model: model_predictions[model]['train'] for model in models},
-                        {model: model_predictions[model]['test'] for model in models}, bins=100)
+                        {model: model_predictions[model]['test'] for model in models}, bins=25)

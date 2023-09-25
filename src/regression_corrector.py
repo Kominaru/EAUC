@@ -6,6 +6,7 @@ from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import LinearRegression
 
 MODEL_NAME = "MF"
+REGRESSION_MODE = "test_probe"  # "train" or "test_probe"
 
 train_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/train_samples.csv")
 test_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/test_samples_with_predictions.csv")
@@ -47,7 +48,23 @@ test_samples = test_samples[
 #############################
 
 lr = LinearRegression()
-lr.fit(train_samples[["rating", "user_avg_rating", "movie_avg_rating"]], train_samples["pred"])
+
+if REGRESSION_MODE == "train":
+
+    lr.fit(train_samples[["rating", "user_avg_rating", "movie_avg_rating"]], train_samples["pred"])
+
+elif REGRESSION_MODE == "test_probe":
+
+    # Extract a probe set from the test set
+    test_probe = test_samples.sample(frac=1/5, random_state=0)
+    test_samples = test_samples.drop(test_probe.index)
+
+    # Add to the probe set a number of samples from the train set equal to the number of samples in the probe set
+    train_probe = train_samples.sample(n=len(test_probe), random_state=0)
+    test_probe = pd.concat([test_probe, train_probe])
+
+    # Fit the linear regression on the probe set
+    lr.fit(test_probe[["rating", "user_avg_rating", "movie_avg_rating"]], test_probe["pred"])
 
 print(
     f"""
