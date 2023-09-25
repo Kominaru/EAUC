@@ -46,7 +46,7 @@ class MovieLensDataset(Dataset):
         return user_id, movie_id, rating
 
 class MovieLensDataModule(LightningDataModule):
-    def __init__(self, data_dir, batch_size=64, num_workers=0, test_size=0.1):
+    def __init__(self, data_dir, batch_size=64, num_workers=0, test_size=0.1, dataset_name='ml-1m'):
         '''
         Creates a MovieLens datamodule with a holdout train-test split.
         Downloads the dataset if it doesn't exist in the data directory.
@@ -63,18 +63,8 @@ class MovieLensDataModule(LightningDataModule):
         self.num_workers = num_workers
         self.test_size = test_size
 
-        # Download the dataset if it doesn't exist in the data directory
-        if not os.path.exists(self.data_dir):
-            os.makedirs(self.data_dir)
-
-            data_url = 'http://files.grouplens.org/datasets/movielens/ml-1m.zip'
-            download_url(data_url, self.data_dir, 'ml-1m.zip', None)
-            import zipfile
-            with zipfile.ZipFile(os.path.join(self.data_dir, 'ml-1m.zip'), 'r') as zip_ref:
-                zip_ref.extractall(self.data_dir)
-
         # Load the dataset from the file
-        self.data = pd.read_csv(os.path.join(self.data_dir, "ml-1m/ratings.dat"), sep='::', engine='python', header=None)
+        self.data = pd.read_csv(os.path.join(self.data_dir, f"{dataset_name}/ratings.dat"), sep='::', engine='python', header=None)
         self.data.columns = ['user_id', 'movie_id', 'rating', 'timestamp']
 
         # Split the df into train and test sets (pandas dataframe)

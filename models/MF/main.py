@@ -9,6 +9,7 @@ from model import CollaborativeFilteringModel
 from os import path
 
 DATA_DIR = "data/"
+DATASET_NAME = "ml-10m"
 
 EMBEDDING_DIM = 512
 
@@ -20,7 +21,7 @@ def train_MF_movielens():
 
     # Load the MovieLens dataset using the data module
     data_module = MovieLensDataModule(
-        DATA_DIR, batch_size=2**15, num_workers=4, test_size=0.1
+        DATA_DIR, batch_size=2**15, num_workers=4, test_size=0.1, dataset_name=DATASET_NAME
     )
 
     # Initialize the collaborative filtering model
