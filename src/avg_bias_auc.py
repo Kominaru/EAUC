@@ -1,6 +1,6 @@
 # Utility to compute, given a dataframe of samples, the AVG-BIAS-AUC of the model.
 # The AVG-BIAS-AUC is the area under the curve where the x-axis is the distance from the rating
-# to the average of the average rating of the user and the average rating of the movie, and the
+# to the average of the average rating of the user and the average rating of the item, and the
 # y-axis is the error of the prediction
 
 from typing import Literal
@@ -17,7 +17,7 @@ def compute_avg_bias_auc(
     """
     Compute the AVG-BIAS-AUC of the model
     - Params:
-        - samples (pandas.DataFrame): dataframe containing the samples. Should have the columns 'rating', 'pred', 'user_id', 'movie_id'
+        - samples (pandas.DataFrame): dataframe containing the samples. Should have the columns 'rating', 'pred', 'user_id', 'item_id'
         - method (str): method to use to compute the AVG-BIAS-AUC.
             - 'bins': compute the AVG-BIAS-AUC by dividing the x-axis into bins of equal width and computing the mean error in each bin
             - 'ordered': compute the AVG-BIAS-AUC by ordering the samples by the x-axis
@@ -30,24 +30,23 @@ def compute_avg_bias_auc(
     # If test_samples is None, assume we want to compute the AVG-BIAS-AUC on the train set
     test_samples = train_samples.copy() if test_samples is None else test_samples
 
-    # Compute the average rating per user and movie
+    # Compute the average rating per user and item
     user_avg_ratings = train_samples.groupby("user_id")["rating"].mean()
-    movie_avg_ratings = train_samples.groupby("movie_id")["rating"].mean()
+    item_avg_ratings = train_samples.groupby("item_id")["rating"].mean()
 
     train_samples["user_avg_rating"] = train_samples["user_id"].map(user_avg_ratings)
-    train_samples["movie_avg_rating"] = train_samples["movie_id"].map(movie_avg_ratings)
+    train_samples["item_avg_rating"] = train_samples["item_id"].map(item_avg_ratings)
 
     test_samples["user_avg_rating"] = test_samples["user_id"].map(user_avg_ratings)
-    test_samples["movie_avg_rating"] = test_samples["movie_id"].map(movie_avg_ratings)
+    test_samples["item_avg_rating"] = test_samples["item_id"].map(item_avg_ratings)
 
-    # Filter out samples for which the user or movie average rating is not available
+    # Filter out samples for which the user or item average rating is not available
     test_samples = test_samples[~test_samples["user_avg_rating"].isna()]
-    test_samples = test_samples[~test_samples["movie_avg_rating"].isna()]
+    test_samples = test_samples[~test_samples["item_avg_rating"].isna()]
 
     # Compute the rating-avg distances
     test_samples["user_rating_avg_dist"] = (
-        test_samples["rating"]
-        - (test_samples["user_avg_rating"] + test_samples["movie_avg_rating"]) / 2
+        test_samples["rating"] - (test_samples["user_avg_rating"] + test_samples["item_avg_rating"]) / 2
     )
 
     test_samples["error"] = (test_samples["rating"] - test_samples["pred"]).abs()
@@ -61,9 +60,7 @@ def compute_avg_bias_auc(
             bins,
         )
 
-        errors_by_dist = test_samples.groupby(
-            pd.cut(test_samples["user_rating_avg_dist"], bins)
-        )["error"].mean()
+        errors_by_dist = test_samples.groupby(pd.cut(test_samples["user_rating_avg_dist"], bins))["error"].mean()
 
         xx = errors_by_dist.index.to_series().apply(lambda x: x.mid).values
         yy = errors_by_dist.values
@@ -83,18 +80,15 @@ def compute_avg_bias_auc(
         yy = avg_bias_auc.values
 
     else:
-        raise ValueError(
-            f"Method {method} not recognized. Must be one of ['bins', 'ordered', 'grouped']"
-        )
+        raise ValueError(f"Method {method} not recognized. Must be one of ['bins', 'ordered', 'grouped']")
 
     xx = xx[~np.isnan(yy)]  # Filter out NaNs. Otherwise, np.trapz returns NaN
     yy = yy[~np.isnan(yy)]
 
     # Compute the AVG-BIAS-AUC and normalize to [0, 1]
     avg_bias_auc = np.trapz(yy, xx) / (
-        (xx.max() - xx.min())
-        * (test_samples["rating"].max() - test_samples["rating"].min())
-    )  # The maximum error is the difference between the maximum and minimum rating (4 in MovieLens),
+        (xx.max() - xx.min()) * (test_samples["rating"].max() - test_samples["rating"].min())
+    )  # The maximum error is the difference between the maximum and minimum rating (4 in ItemLens),
     # and the avg-to-rating distances are taken from the data directly. Therefore, the worst case
     # scenario would be a rectangle of width (xx.max() - xx.min()) and height (test_samples["rating"].max() - test_samples["rating"].min())
 

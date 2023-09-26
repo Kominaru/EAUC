@@ -12,6 +12,7 @@ import requests
 import zipfile
 import io
 import sys
+import os
 
 
 def download_and_extract_from_url(url, dataset_name):
@@ -41,17 +42,16 @@ def download_data(dataset_name):
     """
 
     if dataset_name == "ml-100k":
-        download_and_extract_from_url(
-            "http://files.grouplens.org/datasets/movielens/ml-100k.zip", dataset_name
-        )
+        download_and_extract_from_url("http://files.grouplens.org/datasets/movielens/ml-100k.zip", dataset_name)
     elif dataset_name == "ml-1m":
-        download_and_extract_from_url(
-            "http://files.grouplens.org/datasets/movielens/ml-1m.zip", dataset_name
-        )
+        download_and_extract_from_url("http://files.grouplens.org/datasets/movielens/ml-1m.zip", dataset_name)
     elif dataset_name == "ml-10m":
-        download_and_extract_from_url(
-            "http://files.grouplens.org/datasets/movielens/ml-10m.zip", dataset_name
-        )
+        download_and_extract_from_url("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dataset_name)
+        os.rename("data/ml-10M100K", "data/ml-10m")
+    elif dataset_name.startswith("tripadvisor"):
+        city = dataset_name.split("-")[1]
+        download_and_extract_from_url(f"https://zenodo.org/record/5644892/files/{city}.zip?download=1", dataset_name)
+        os.rename(f"data/{city}", f"data/{dataset_name}")
     else:
         print("Dataset not supported yet.")
         return

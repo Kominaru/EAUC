@@ -18,29 +18,29 @@ print(f"Dataset statistics")
 
 print(f"\t#Ratings: {len(all_samples)}")
 print(f"\t#Users:   {all_samples['user_id'].nunique()}")
-print(f"\t#Movies:  {all_samples['movie_id'].nunique()}")
+print(f"\t#Items:  {all_samples['item_id'].nunique()}")
 
-# Compute the average rating per user and per movie
+# Compute the average rating per user and per item
 user_avg_ratings = train_samples.groupby("user_id")["rating"].mean()
-movie_avg_ratings = train_samples.groupby("movie_id")["rating"].mean()
+item_avg_ratings = train_samples.groupby("item_id")["rating"].mean()
 
 # Add the avg. ratings as a column to the train and test samples
 train_samples["user_avg_rating"] = train_samples["user_id"].map(user_avg_ratings)
-train_samples["movie_avg_rating"] = train_samples["movie_id"].map(movie_avg_ratings)
+train_samples["item_avg_rating"] = train_samples["item_id"].map(item_avg_ratings)
 test_samples["user_avg_rating"] = test_samples["user_id"].map(user_avg_ratings)
-test_samples["movie_avg_rating"] = test_samples["movie_id"].map(movie_avg_ratings)
+test_samples["item_avg_rating"] = test_samples["item_id"].map(item_avg_ratings)
 
-# Filter the train and test samples by the average rating of the user and the movie
+# Filter the train and test samples by the average rating of the user and the item
 USER_AVG_RATING_RANGE = (0, 5)
-MOVIE_AVG_RATING_RANGE = (0, 5)
+ITEM_AVG_RATING_RANGE = (0, 5)
 
 train_samples = train_samples[
     train_samples["user_avg_rating"].between(*USER_AVG_RATING_RANGE)
-    & train_samples["movie_avg_rating"].between(*MOVIE_AVG_RATING_RANGE)
+    & train_samples["item_avg_rating"].between(*ITEM_AVG_RATING_RANGE)
 ]
 test_samples = test_samples[
     test_samples["user_avg_rating"].between(*USER_AVG_RATING_RANGE)
-    & test_samples["movie_avg_rating"].between(*MOVIE_AVG_RATING_RANGE)
+    & test_samples["item_avg_rating"].between(*ITEM_AVG_RATING_RANGE)
 ]
 
 #############################
@@ -50,13 +50,11 @@ test_samples = test_samples[
 lr = LinearRegression()
 
 if REGRESSION_MODE == "train":
-
-    lr.fit(train_samples[["rating", "user_avg_rating", "movie_avg_rating"]], train_samples["pred"])
+    lr.fit(train_samples[["rating", "user_avg_rating", "item_avg_rating"]], train_samples["pred"])
 
 elif REGRESSION_MODE == "test_probe":
-
     # Extract a probe set from the test set
-    test_probe = test_samples.sample(frac=1/5, random_state=0)
+    test_probe = test_samples.sample(frac=1 / 5, random_state=0)
     test_samples = test_samples.drop(test_probe.index)
 
     # Add to the probe set a number of samples from the train set equal to the number of samples in the probe set
@@ -64,24 +62,24 @@ elif REGRESSION_MODE == "test_probe":
     test_probe = pd.concat([test_probe, train_probe])
 
     # Fit the linear regression on the probe set
-    lr.fit(test_probe[["rating", "user_avg_rating", "movie_avg_rating"]], test_probe["pred"])
+    lr.fit(test_probe[["rating", "user_avg_rating", "item_avg_rating"]], test_probe["pred"])
 
 print(
     f"""
 ==============================
 Linear equation: 
-        pred = {lr.intercept_:.3f} + {lr.coef_[0]:.3f} * rating + {lr.coef_[1]:.3f} * user_avg_rating + {lr.coef_[2]:.3f} * movie_avg_rating"""
+        pred = {lr.intercept_:.3f} + {lr.coef_[0]:.3f} * rating + {lr.coef_[1]:.3f} * user_avg_rating + {lr.coef_[2]:.3f} * item_avg_rating"""
 )
 
 
 def correct_prediction(sample, lr):
     """
     Return the corrected prediction of a sample using the linear regression by solving the equation for rating.
-    Original prediction: pred = a + b * rating + c * user_avg_rating + d * movie_avg_rating
-    Solveing rating: rating = (pred - a - c * user_avg_rating - d * movie_avg_rating) / b
+    Original prediction: pred = a + b * rating + c * user_avg_rating + d * item_avg_rating
+    Solveing rating: rating = (pred - a - c * user_avg_rating - d * item_avg_rating) / b
 
     Params:
-        sample: A Pandas Row with the columns "rating", "user_avg_rating", "movie_avg_rating" and "pred"
+        sample: A Pandas Row with the columns "rating", "user_avg_rating", "item_avg_rating" and "pred"
         lr: the linear regression model
 
     Returns:
@@ -93,7 +91,7 @@ def correct_prediction(sample, lr):
             sample["pred"]
             - lr.intercept_
             - lr.coef_[1] * sample["user_avg_rating"]
-            - lr.coef_[2] * sample["movie_avg_rating"]
+            - lr.coef_[2] * sample["item_avg_rating"]
         )
         / lr.coef_[0]
     ).clip(1, 5)
@@ -104,8 +102,8 @@ def correct_prediction(sample, lr):
 train_samples["pred"] = train_samples.apply(correct_prediction, args=[lr], axis=1)
 test_samples["pred"] = test_samples.apply(correct_prediction, args=[lr], axis=1)
 
-train_samples = train_samples[["user_id", "movie_id", "rating", "pred"]]
-test_samples = test_samples[["user_id", "movie_id", "rating", "pred"]]
+train_samples = train_samples[["user_id", "item_id", "rating", "pred"]]
+test_samples = test_samples[["user_id", "item_id", "rating", "pred"]]
 
 os.makedirs(f"outputs/{MODEL_NAME}_correction_lr", exist_ok=True)
 
@@ -122,7 +120,7 @@ exit()
 def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts_dict, bins=20):
     samples = samples.copy()
 
-    samples["dist_avg_to_rating"] = (samples["user_avg_rating"] + samples["movie_avg_rating"]) / 2 - samples["rating"]
+    samples["dist_avg_to_rating"] = (samples["user_avg_rating"] + samples["item_avg_rating"]) / 2 - samples["rating"]
 
     samples["dist_avg_to_rating_bin"] = pd.cut(samples["dist_avg_to_rating"], bins=np.linspace(-4, 4, bins + 1))
 
@@ -197,7 +195,7 @@ def plot_error_distribution_by_difference_rating_to_avg_rating(samples, predicts
     plt.grid(which="major", axis="both", linestyle="-", linewidth=0.5)
     plt.grid(which="minor", axis="both", linestyle=":", linewidth=0.5)
 
-    plt.xlabel("Avg(avgrating(user),avgrating(movie)) - rating")
+    plt.xlabel("Avg(avgrating(user),avgrating(item)) - rating")
     plt.ylabel("Prediction error")
 
     plt.legend()

@@ -8,7 +8,7 @@ def plot_dataset_statistics_figures(
     """
     Plots the basic dataset statistics figures:
     - Histogram of the ratings as a whole with logarithmic y-scale
-    - Histogram of the average rating per movie (train set)
+    - Histogram of the average rating per item (train set)
     - Histogram of the average rating per user (train set)
     :param all_samples: pandas dataframe containing all samples
     :param train_samples: pandas dataframe containing the train samples
@@ -17,21 +17,19 @@ def plot_dataset_statistics_figures(
     """
 
     # 1. Plot histogram of the ratings as a whole with logarithmic y-scale (using bar plot)
-    all_samples["rating"].value_counts().sort_index().plot.bar(
-        logy=True, title="Histogram of Ratings"
-    )
+    all_samples["rating"].value_counts().sort_index().plot.bar(logy=True, title="Histogram of Ratings")
     plt.xlabel("Rating")
     plt.ylabel("# of ratings")
     plt.savefig("figures/" + MODEL_NAME + "/hist_ratings.pdf")
     plt.clf()
 
-    # 2. Histogram of the average rating per movie (train set)
-    train_samples.groupby("movie_id")["rating"].mean().plot.hist(
-        bins=25, title="Histogram of Average Movie Ratings", logy=True
+    # 2. Histogram of the average rating per item (train set)
+    train_samples.groupby("item_id")["rating"].mean().plot.hist(
+        bins=25, title="Histogram of Average Item Ratings", logy=True
     )
     plt.xlabel("Average Rating")
-    plt.ylabel("# of movies")
-    plt.savefig("figures/" + MODEL_NAME + "/hist_avg_movie_ratings.pdf")
+    plt.ylabel("# of items")
+    plt.savefig("figures/" + MODEL_NAME + "/hist_avg_item_ratings.pdf")
     plt.clf()
 
     # 3. Histogram of the average rating per user (train set)

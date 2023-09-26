@@ -18,19 +18,17 @@ MODEL_NAME = "MF"
 os.makedirs(f"figures/{MODEL_NAME}/", exist_ok=True)
 
 
-def print_basic_dataset_statistics(
-    train_samples: pd.DataFrame, test_samples: pd.DataFrame
-):
+def print_basic_dataset_statistics(train_samples: pd.DataFrame, test_samples: pd.DataFrame):
     """
     1) Prints basic statistics about the dataset:
-    - Number of ratings, users and movies
+    - Number of ratings, users and items
     - Min and max ratings and predictions
     - Number of users in the test set but not in the training set
     - Number of train samples repeated in the test set
 
     2) Plots the basic dataset statistics figures:
     - Histogram of the ratings as a whole with logarithmic y-scale
-    - Histogram of the average rating per movie (train set)
+    - Histogram of the average rating per item (train set)
     - Histogram of the average rating per user (train set)
 
     Parameters:
@@ -45,7 +43,7 @@ def print_basic_dataset_statistics(
 
     print(f"    #Ratings:\t\t\t\t{len(all_samples)}")
     print(f'    #Users:\t\t\t\t{len(all_samples["user_id"].unique())}')
-    print(f'    #Movies:\t\t\t\t{len(all_samples["movie_id"].unique())}')
+    print(f'    #Items:\t\t\t\t{len(all_samples["item_id"].unique())}')
 
     # Min and max ratings
     min_rating, max_rating = all_samples["rating"].min(), all_samples["rating"].max()
@@ -55,19 +53,15 @@ def print_basic_dataset_statistics(
     print(f"    Min-max predictions:\t\t{min_pred:.1f} - {max_pred:.1f}")
 
     # How many users are in the test set but not in the training set?
-    print(
-        f'    #Unseen test users:\t\t\t{len(test_samples[~test_samples["user_id"].isin(train_samples["user_id"])])}'
-    )
+    print(f'    #Unseen test users:\t\t\t{len(test_samples[~test_samples["user_id"].isin(train_samples["user_id"])])}')
 
-    train_tuples = train_samples[["user_id", "movie_id"]].apply(tuple, axis=1)
-    test_tuples = test_samples[["user_id", "movie_id"]].apply(tuple, axis=1)
+    train_tuples = train_samples[["user_id", "item_id"]].apply(tuple, axis=1)
+    test_tuples = test_samples[["user_id", "item_id"]].apply(tuple, axis=1)
 
     print(f"    #Repeated train-test samples:\t{test_tuples.isin(train_tuples).sum()}")
 
     # Plot figures
-    plot_dataset_statistics_figures(
-        all_samples.copy(), train_samples.copy(), MODEL_NAME
-    )
+    plot_dataset_statistics_figures(all_samples.copy(), train_samples.copy(), MODEL_NAME)
 
 
 def compute_rmse(train_samples: pd.DataFrame, test_samples: pd.DataFrame):
@@ -95,11 +89,11 @@ def compute_rmse(train_samples: pd.DataFrame, test_samples: pd.DataFrame):
 def plot_model_prediction_analysis(train_samples, test_samples):
     """
     Plots the figures for the model prediction analysis:
-    1. Heatmap of the frequency of the ratings depending on user and movie average ratings (train set)
+    1. Heatmap of the frequency of the ratings depending on user and item average ratings (train set)
     2. Heatmap of the frequency of test samples depending on rating and prediction bins (test set)
-    3. Heatmap of the RMSE depending on user and movie average ratings (train set) separated by unique ratings
+    3. Heatmap of the RMSE depending on user and item average ratings (train set) separated by unique ratings
     4. Heatmap of the frequency of test samples depending on rating and prediction bins (test set)
-       separated by the user and movie average ratings (train set)
+       separated by the user and item average ratings (train set)
 
     Parameters:
         train_samples (pd.DataFrame): Train samples.
@@ -109,29 +103,17 @@ def plot_model_prediction_analysis(train_samples, test_samples):
     print("=====================================")
     print("Model prediction bias analysis plots")
     print("=====================================")
-    print(
-        "1) Heatmap of the frequency of the ratings depending on user and movie average ratings (train set)"
-    )
-    all_ratings_2dheatmap(
-        train_samples.copy(), test_samples.copy(), MODEL_NAME, bin_interval=0.5
-    )
+    print("1) Heatmap of the frequency of the ratings depending on user and item average ratings (train set)")
+    all_ratings_2dheatmap(train_samples.copy(), test_samples.copy(), MODEL_NAME, bin_interval=0.5)
+
+    print("2) Heatmap of the frequency of test samples depending on rating and prediction bins (test set)")
+    plot_2dheatmap_ratings_vs_preds(test_samples.copy(), MODEL_NAME, preds_bin_interval=0.25)
+
+    print("3) Heatmap of the RMSE depending on user and item average ratings (train set) separated by unique ratings")
+    plot_2heatmaps_grid_by_unique_ratings(train_samples.copy(), test_samples.copy(), MODEL_NAME, bin_interval=0.5)
 
     print(
-        "2) Heatmap of the frequency of test samples depending on rating and prediction bins (test set)"
-    )
-    plot_2dheatmap_ratings_vs_preds(
-        test_samples.copy(), MODEL_NAME, preds_bin_interval=0.25
-    )
-
-    print(
-        "3) Heatmap of the RMSE depending on user and movie average ratings (train set) separated by unique ratings"
-    )
-    plot_2heatmaps_grid_by_unique_ratings(
-        train_samples.copy(), test_samples.copy(), MODEL_NAME, bin_interval=0.5
-    )
-
-    print(
-        "4) Heatmap of the frequency of test samples depending on rating and prediction bins (test set) separated by the user and movie average ratings (train set)"
+        "4) Heatmap of the frequency of test samples depending on rating and prediction bins (test set) separated by the user and item average ratings (train set)"
     )
     plot_ratings_vs_preds_2dheatmaps_grid(
         train_samples.copy(),
@@ -153,9 +135,7 @@ def plot_model_prediction_analysis(train_samples, test_samples):
 if __name__ == "__main__":
     # Load train and test samples
     train_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/train_samples.csv")
-    test_samples: pd.DataFrame = pd.read_csv(
-        f"outputs/{MODEL_NAME}/test_samples_with_predictions.csv"
-    )
+    test_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/test_samples_with_predictions.csv")
 
     # Print basic dataset statistics
     print_basic_dataset_statistics(train_samples, test_samples)
