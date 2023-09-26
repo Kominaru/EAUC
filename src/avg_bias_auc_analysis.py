@@ -83,6 +83,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--models", nargs="+", type=str, help="List of models to compare")
     parser.add_argument("--auc_method", type=str, default="ordered")
+    parser.add_argument("--bins", type=int, default=20)
     return parser.parse_args()
 
 
@@ -90,6 +91,7 @@ if __name__ == "__main__":
     args = parse_args()
     models = args.models
     auc_method = args.auc_method
+    bins = args.bins
 
     # Load dataframes for each model
     model_predictions = {}
@@ -103,9 +105,9 @@ if __name__ == "__main__":
     print("----------------------------------")
     print("Model               Train\tTest")
     for model in models:
-        train_avg_bias_auc = compute_avg_bias_auc(model_predictions[model]["train"], method=auc_method, bins=20)
+        train_avg_bias_auc = compute_avg_bias_auc(model_predictions[model]["train"], method=auc_method, bins=bins)
         test_avg_bias_auc = compute_avg_bias_auc(
-            model_predictions[model]["train"], model_predictions[model]["test"], method=auc_method, bins=20
+            model_predictions[model]["train"], model_predictions[model]["test"], method=auc_method, bins=bins
         )
         print(f"{model:<20}{train_avg_bias_auc:.4f}\t{test_avg_bias_auc:.4f}")
     print("------------")

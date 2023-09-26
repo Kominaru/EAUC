@@ -9,7 +9,7 @@ from model import CollaborativeFilteringModel
 from os import path
 
 DATA_DIR = "data/"
-DATASET_NAME = "tripadvisor-london"
+DATASET_NAME = "douban-monti"
 
 EMBEDDING_DIM = 512
 

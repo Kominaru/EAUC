@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from torch.utils.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
+import h5py
 
 
 def load_and_format_tripadvisor_data(dataset_name):
@@ -51,10 +52,56 @@ def load_and_format_movielens_data(dataset_name):
     """
 
     df = pd.read_csv(os.path.join("data", dataset_name, "ratings.dat"), sep="::", engine="python", header=None)
-    df.columns = ["user_id", "movie_id", "rating", "timestamp"]
-    df = df[["user_id", "movie_id", "rating"]]
+    df.columns = ["user_id", "item_id", "rating", "timestamp"]
+    df = df[["user_id", "item_id", "rating"]]
 
     return df
+
+
+def load_and_format_doubanmonti_data(dataset_name):
+    # Open douban-monti dataset (matlab file) using h5py
+    with h5py.File(os.path.join("data", dataset_name, "training_test_dataset.mat"), "r") as f:
+        # Convert to numpy arrays
+
+        data = np.array(f["M"])
+        train_data = np.array(f["M"]) * np.array(f["Otraining"])
+        test_data = np.array(f["M"]) * np.array(f["Otest"])
+
+    def rating_matrix_to_dataframe(ratings: np.ndarray):
+        """
+        Converts a rating matrix to a pandas DataFrame.
+
+        Args:
+            ratings (np.ndarray): Rating matrix
+
+        Returns:
+            pandas.DataFrame: DataFrame containing the ratings
+        """
+
+        # Get the indices of the non-zero ratings
+        nonzero_indices = np.nonzero(ratings)
+
+        # Create the dataframe
+        df = pd.DataFrame(
+            {
+                "user_id": nonzero_indices[0],
+                "item_id": nonzero_indices[1],
+                "rating": ratings[nonzero_indices],
+            }
+        )
+
+        # Min and max ratings
+        min_rating = df["rating"].min()
+        max_rating = df["rating"].max()
+
+        return df
+
+    # Convert the training and test data to dataframes
+    all_df = rating_matrix_to_dataframe(data)
+    train_df = rating_matrix_to_dataframe(train_data)
+    test_df = rating_matrix_to_dataframe(test_data)
+
+    return all_df, train_df, test_df
 
 
 class DyadicRegressionDataset(Dataset):
@@ -120,13 +167,16 @@ class DyadicRegressionDataModule(LightningDataModule):
             self.data = load_and_format_movielens_data(dataset_name)
         elif dataset_name.startswith("tripadvisor-"):
             self.data = load_and_format_tripadvisor_data(dataset_name)
+        elif dataset_name == "douban-monti":
+            self.data, self.train_df, self.test_df = load_and_format_doubanmonti_data(dataset_name)
 
-        # Split the df into train and test sets (pandas dataframe)
+        if dataset_name != "douban-monti":
+            # Split the df into train and test sets (pandas dataframe)
 
-        msk = np.random.rand(len(self.data)) < (1 - self.test_size)
+            msk = np.random.rand(len(self.data)) < (1 - self.test_size)
 
-        self.train_df = self.data[msk]
-        self.test_df = self.data[~msk]
+            self.train_df = self.data[msk]
+            self.test_df = self.data[~msk]
 
         print(f"#Training samples: {len(self.train_df)}")
         print(f"#Test samples    : {len(self.test_df)}")
@@ -140,6 +190,10 @@ class DyadicRegressionDataModule(LightningDataModule):
         self.num_users = self.data["user_id"].max() + 1
         self.num_items = self.data["item_id"].max() + 1
         self.mean_rating = self.data["rating"].mean()
+
+        print(f"#Users: {self.num_users}")
+        print(f"#Items: {self.num_items}")
+        print(f"Mean rating: {self.mean_rating:.3f}")
 
         # Reset index and create PyTorch datasets
 

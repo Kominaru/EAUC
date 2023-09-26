@@ -27,8 +27,17 @@ def download_and_extract_from_url(url, dataset_name):
 
     print("Downloading and extracting " + dataset_name + " dataset...")
     r = requests.get(url)
-    z = zipfile.ZipFile(io.BytesIO(r.content))
-    z.extractall("data/")
+
+    # If file is a zip file...
+    if zipfile.is_zipfile(io.BytesIO(r.content)):
+        z = zipfile.ZipFile(io.BytesIO(r.content))
+        z.extractall("data/")
+    else:
+        # Save the file
+        os.makedirs("data/" + dataset_name, exist_ok=True)
+        with open("data/" + dataset_name + "/training-test-dataset.mat", "wb") as f:
+            f.write(r.content)
+
     print("Done!")
 
 
@@ -52,6 +61,10 @@ def download_data(dataset_name):
         city = dataset_name.split("-")[1]
         download_and_extract_from_url(f"https://zenodo.org/record/5644892/files/{city}.zip?download=1", dataset_name)
         os.rename(f"data/{city}", f"data/{dataset_name}")
+    elif dataset_name == "douban-monti":
+        download_and_extract_from_url(
+            f"https://github.com/fmonti/mgcnn/blob/master/Data/douban/training_test_dataset.mat?raw=true", dataset_name
+        )
     else:
         print("Dataset not supported yet.")
         return
