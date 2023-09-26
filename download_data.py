@@ -8,6 +8,7 @@
 # - ml-1m
 # - ml-10m
 
+import tarfile
 import requests
 import zipfile
 import io
@@ -28,9 +29,14 @@ def download_and_extract_from_url(url, dataset_name):
     print("Downloading and extracting " + dataset_name + " dataset...")
     r = requests.get(url)
 
-    # If file is a zip file...
+    # If file is a zip file, extract it
     if zipfile.is_zipfile(io.BytesIO(r.content)):
         z = zipfile.ZipFile(io.BytesIO(r.content))
+        z.extractall("data/")
+
+    # If file is a tar file, extract it
+    elif tarfile.is_tarfile(io.BytesIO(r.content)):
+        z = tarfile.open(fileobj=io.BytesIO(r.content))
         z.extractall("data/")
     else:
         # Save the file
@@ -65,6 +71,43 @@ def download_data(dataset_name):
         download_and_extract_from_url(
             f"https://github.com/fmonti/mgcnn/blob/master/Data/douban/training_test_dataset.mat?raw=true", dataset_name
         )
+    elif dataset_name == "netflix-prize":
+        if not os.path.exists("data/netflix-prize"):
+            download_and_extract_from_url(
+            f"https://archive.org/download/nf_prize_dataset.tar/nf_prize_dataset.tar.gz", dataset_name
+            )
+            os.rename("data/download", "data/netflix-prize")
+
+        # Untar training set
+        if not os.path.exists("data/netflix-prize/ratings.csv"):
+            print("Extracting training set...")
+            tar = tarfile.open("data/netflix-prize/training_set.tar")
+            tar.extractall("data/netflix-prize/")
+            tar.close()
+
+            # Merge training set files
+            print("Merging training set files...")
+            with open("data/netflix-prize/ratings.csv", "w") as outfile:
+                outfile.write("user_id,movie_id,rating\n")
+                for filename in os.listdir("data/netflix-prize/training_set"):
+                    print(f"Merging {filename}...", end="\r")
+                    if os.path.isfile(os.path.join("data/netflix-prize/training_set", filename)):
+                        # Open it
+                        with open(os.path.join("data/netflix-prize/training_set", filename)) as infile:
+                            
+                            # The first line is the movie id
+                            movie_id = infile.readline().split(":")[0]
+
+                            # The rest of the lines are the user id and rating
+                            for line in infile:
+                                user_id, rating, _ = line.split(",")
+                                outfile.write(f"{user_id},{movie_id},{rating}\n")
+
+            # Remove everything inside the training_set folder
+            for filename in os.listdir("data/netflix-prize/training_set"):
+                os.remove(os.path.join("data/netflix-prize/training_set", filename))
+            os.rmdir("data/netflix-prize/training_set")
+
     else:
         print("Dataset not supported yet.")
         return
