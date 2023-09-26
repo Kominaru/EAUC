@@ -35,7 +35,7 @@ def download_and_extract_from_url(url, dataset_name):
     else:
         # Save the file
         os.makedirs("data/" + dataset_name, exist_ok=True)
-        with open("data/" + dataset_name + "/training-test-dataset.mat", "wb") as f:
+        with open("data/" + dataset_name + "/training_test_dataset.mat", "wb") as f:
             f.write(r.content)
 
     print("Done!")
