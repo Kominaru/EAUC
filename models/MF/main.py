@@ -11,8 +11,8 @@ from os import path
 
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
-    dataset_name="douban-monti",
-    embedding_dim=512,
+    dataset_name="netflix-prize",
+    embedding_dim=8,
     data_dir="data",
     max_epochs=1000,
     batch_size=2**14,
@@ -118,7 +118,7 @@ def train_MF(
 
 
 if __name__ == "__main__":
-    MODE = "tune"
+    MODE = "train"
 
     if MODE == "train":
         train_MF()

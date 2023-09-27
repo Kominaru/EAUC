@@ -68,7 +68,7 @@ class CollaborativeFilteringModel(LightningModule):
         )  # We add the user and item biases and the global bias
 
         # Apply the sigmoid function to the prediction then rescale it to the range [1.0, 5.0]
-        # prediction = (torch.sigmoid(prediction) * 4.0) + 1.0
+        # prediction = (torch.sigmoid(dot_product) * 4.0) + 1.0
 
         return prediction
 

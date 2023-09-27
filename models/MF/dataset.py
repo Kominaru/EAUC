@@ -104,6 +104,34 @@ def load_and_format_doubanmonti_data(dataset_name):
     return all_df, train_df, test_df
 
 
+def load_and_format_netflixprize_data(dataset_name):
+    """
+    Formats a raw Netflix Prize dataset into a the standard user/item format used in this project.
+    The datasets are available at https://www.kaggle.com/netflix-inc/netflix-prize-data
+
+    Args:
+        dataset_name (str): Name of the dataset (netflix-prize)
+
+    Returns:
+        pandas.DataFrame: DataFrame containing the formatted dataset with the columns ['user_id', 'item_id', 'rating']
+    """
+
+    # Load the data
+    df = pd.read_csv("data/netflix-prize/ratings.csv")
+
+    # Rename the columns
+    df.columns = ["user_id", "item_id", "rating"]
+
+    # Make the ids start from 0 by creating new user and item ids
+    df["user_id"] = df["user_id"].astype("category").cat.codes
+    df["item_id"] = df["item_id"].astype("category").cat.codes
+
+    # Convert ratings to float
+    df["rating"] = df["rating"].astype(np.float32)
+
+    return df
+
+
 class DyadicRegressionDataset(Dataset):
     """
     Represents a dataset for regression over dyadic data.
@@ -167,6 +195,8 @@ class DyadicRegressionDataModule(LightningDataModule):
             self.data = load_and_format_movielens_data(dataset_name)
         elif dataset_name.startswith("tripadvisor-"):
             self.data = load_and_format_tripadvisor_data(dataset_name)
+        elif dataset_name == "netflix-prize":
+            self.data = load_and_format_netflixprize_data(dataset_name)
         elif dataset_name == "douban-monti":
             self.data, self.train_df, self.test_df = load_and_format_doubanmonti_data(dataset_name)
 
