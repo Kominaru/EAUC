@@ -112,6 +112,20 @@ if __name__ == "__main__":
         print(f"{model:<20}{train_avg_bias_auc:.4f}\t{test_avg_bias_auc:.4f}")
     print("------------")
 
+    # Pretty print a table with the RMSE for each model
+    print("RMSE")
+    print("----------------------------------")
+    print("Model               Train\tTest")
+    for model in models:
+        train_rmse = (
+            (model_predictions[model]["train"]["rating"] - model_predictions[model]["train"]["pred"]) ** 2
+        ).mean() ** 0.5
+        test_rmse = (
+            (model_predictions[model]["test"]["rating"] - model_predictions[model]["test"]["pred"]) ** 2
+        ).mean() ** 0.5
+        print(f"{model:<20}{train_rmse:.4f}\t{test_rmse:.4f}")
+    print("------------")
+
     # Plot the train error by distance to the average rating for each model
     plot_avg_bias_error({model: model_predictions[model]["train"] for model in models}, bins=25)
 
