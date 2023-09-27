@@ -52,9 +52,9 @@ In order to demostrate the potential for mitigation of this bias, after and poss
 
 The following table shows the results of the experiments:
 
-| Dataset | RMSE | BIAS-AUC | NBIAS-AUC | BIAS-AUC (corrected) | NBIAS-AUC (corrected) |
-|---------|------|----------|-----------|----------------------|-----------------------|
-| Movielens 1M | 0.87 | 0.000 | 0.000 | 0.000 | 0.000 |
-| Movielens 10M | 0.87 | 0.000 | 0.000 | 0.000 | 0.000 |
-| Douban Monti | 0.87 | 0.000 | 0.000 | 0.000 | 0.000 |
-| Netflix Prize | 0.87 | 0.000 | 0.000 | 0.000 | 0.000 |
+| Dataset | RMSE | RMSE (corrected) | NBIAS-AUC | NBIAS-AUC (corrected) |
+|---------|------|------------------|-----------|------------------------|
+| Movielens 1M | 0.865 | 0.865 | 0.000 | 0.000 |
+| Movielens 10M | 0.865 | 0.865 | 0.000 | 0.000 |
+| Douban Monti | 0.865 | 0.865 | 0.000 | 0.000 |
+| Netflix Prize | 0.865 | 0.865 | 0.000 | 0.000 |
