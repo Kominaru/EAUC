@@ -8,22 +8,31 @@ from dataset import DyadicRegressionDataModule
 from model import CollaborativeFilteringModel
 from os import path
 
+
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
-def train_MF(dataset_name='douban-monti', embedding_dim=512,
-              data_dir='data', max_epochs=1000, batch_size=2**15,
-                num_workers=4, l2_reg=1e-5, learning_rate=5e-4):
-    
+def train_MF(
+    dataset_name="douban-monti",
+    embedding_dim=512,
+    data_dir="data",
+    max_epochs=1000,
+    batch_size=2**14,
+    num_workers=4,
+    l2_reg=1e-5,
+    learning_rate=5e-4,
+):
     """
     Trains a collaborative filtering model for regression over a dyadic dataset.
     """
 
     # Load the dyadic dataset using the data module
     data_module = DyadicRegressionDataModule(
-        data_dir, batch_size=batch_size, num_workers=num_workers, test_size=0.1, dataset_name=dataset_name)
+        data_dir, batch_size=batch_size, num_workers=num_workers, test_size=0.1, dataset_name=dataset_name
+    )
 
     # Initialize the collaborative filtering model
-    model = CollaborativeFilteringModel(data_module.num_users, data_module.num_items, 
-                                        embedding_dim=embedding_dim, l2_reg=l2_reg, lr=learning_rate)
+    model = CollaborativeFilteringModel(
+        data_module.num_users, data_module.num_items, embedding_dim=embedding_dim, l2_reg=l2_reg, lr=learning_rate
+    )
 
     # Initialize early stopping callback
     # Stops when the validation loss doesn't improve by 1e-4 for 10 epochs
@@ -109,17 +118,15 @@ def train_MF(dataset_name='douban-monti', embedding_dim=512,
 
 
 if __name__ == "__main__":
+    MODE = "tune"
 
-    MODE = 'tune'
-
-    if MODE == 'train':
+    if MODE == "train":
         train_MF()
-    
-    elif MODE == 'tune':
 
+    elif MODE == "tune":
         embedding_dims = [8, 32, 128, 512, 1024]
         l2_regs = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-        learning_rates = [1e-5, 1e-4, 5e-4, 1e-3 ]
+        learning_rates = [1e-5, 1e-4, 5e-4, 1e-3]
 
         # Choose n random hyperparameter combinations
         NUM_TRIALS = 50
@@ -128,22 +135,19 @@ if __name__ == "__main__":
         results_df = []
 
         for i in range(NUM_TRIALS):
-                
-                embedding_dim = random.choice(embedding_dims)
-                l2_reg = random.choice(l2_regs)
-                learning_rate = random.choice(learning_rates)
+            embedding_dim = random.choice(embedding_dims)
+            l2_reg = random.choice(l2_regs)
+            learning_rate = random.choice(learning_rates)
 
-                
-    
-                rmse = train_MF(embedding_dim=embedding_dim, l2_reg=l2_reg, learning_rate=learning_rate)
-    
-                results_df.append([embedding_dim, l2_reg, learning_rate, rmse])
+            rmse = train_MF(embedding_dim=embedding_dim, l2_reg=l2_reg, learning_rate=learning_rate)
 
-                print("==============================================")
-                print(f'Trial {i+1}/{NUM_TRIALS} completed')
-                print(f"Hyperparameters: embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}")
-                print(f"RMSE: {rmse:.3f}")
-                print("==============================================")
+            results_df.append([embedding_dim, l2_reg, learning_rate, rmse])
 
-        results_df = pd.DataFrame(results_df, columns=['embedding_dim', 'l2_reg', 'learning_rate', 'rmse'])
-        results_df.to_csv('outputs/MF/tune_results.csv', index=False)
+            print("==============================================")
+            print(f"Trial {i+1}/{NUM_TRIALS} completed")
+            print(f"Hyperparameters: embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}")
+            print(f"RMSE: {rmse:.3f}")
+            print("==============================================")
+
+        results_df = pd.DataFrame(results_df, columns=["embedding_dim", "l2_reg", "learning_rate", "rmse"])
+        results_df.to_csv("outputs/MF/tune_results.csv", index=False)
