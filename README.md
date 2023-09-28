@@ -21,7 +21,7 @@ The following table shows basic information about the used datasets:
 |---------|---------|---------|-----------|---------|
 | [Movielens 1M](https://grouplens.org/datasets/movielens/1m/) | 6,040 | 3,706 | 1,000,209 | 0,044 |
 | [Movielens 10M](https://grouplens.org/datasets/movielens/10m/) | 69,878 | 10,677 | 10,000,054 | 0,013 |
-| [Douban Monti](https://github.com/fmonti/mgcnn) | 3,000 | 2,000 | 136,066 | 0,015 |
+| [Douban Monti](https://github.com/fmonti/mgcnn) | 3,000 | 3,000 | 136,066 | 0,015 |
 | [Netflix Prize](https://www.kaggle.com/netflix-inc/netflix-prize-data) | 480,189 | 17,770 | 100,480,507 | 0.011 |
 
 In all datasets, the target variable is the rating given by a user to an item. We split the datasets into train, validation and test sets (0.85, 0.05, 0.1). We use the train set to train the models and the validation set to tune the hyperparameters. When then use the joint train and validation sets to train the final model, and evaluate it on the test set.
