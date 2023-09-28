@@ -8,6 +8,7 @@
 # - ml-1m
 # - ml-10m
 
+import shutil
 import tarfile
 import requests
 import zipfile
@@ -41,10 +42,53 @@ def download_and_extract_from_url(url, dataset_name):
     else:
         # Save the file
         os.makedirs("data/" + dataset_name, exist_ok=True)
-        with open("data/" + dataset_name + "/training_test_dataset.mat", "wb") as f:
+        with open("data/" + dataset_name + "/temp_data", "wb") as f:
             f.write(r.content)
 
     print("Done!")
+
+
+def add_movieratings_to_netflix_csv(movie_filename: str, ratings_file: io.TextIOWrapper):
+    """
+    Adds the ratings from the given movie file to the given ratings file.
+    Each file is structured as follows:
+        <movie_id>:
+        <user_id>,<rating>,<date>
+        <user_id>,<rating>,<date>
+        ...
+
+    Parameters:
+        movie_filename (str): The name of the movie file.
+        ratings_file (io.TextIOWrapper): The ratings file.
+    """
+
+    with open(os.path.join("data/netflix-prize/training_set", movie_filename)) as movie_file:
+        movie_id = movie_file.readline().split(":")[0]
+        for line in movie_file:
+            user_id, rating, _ = line.split(",")
+            ratings_file.write(f"{user_id},{movie_id},{rating}\n")
+
+
+def create_netflix_ratings_csv():
+    """
+    Creates a ratings.csv with columns ['user_id', 'movie_id', 'rating'] from the Netflix Prize dataset.
+    The ratings.csv file is saved in the data/netflix-prize folder, which must already exist with the extracted dataset.
+    """
+
+    print("Extracting training set from tar...")
+    tar = tarfile.open("data/netflix-prize/training_set.tar")
+    tar.extractall("data/netflix-prize/")
+    tar.close()
+
+    os.remove("data/netflix-prize/training_set.tar")
+
+    with open("data/netflix-prize/ratings.csv", "w") as outfile:
+        outfile.write("user_id,movie_id,rating\n")
+        for filename in os.listdir("data/netflix-prize/training_set"):
+            print(f"Merging training set files... {filename}", end="\r")
+            add_movieratings_to_netflix_csv(filename, outfile)
+
+    shutil.rmtree("data/netflix-prize/training_set")
 
 
 def download_data(dataset_name):
@@ -56,58 +100,40 @@ def download_data(dataset_name):
         dataset_name (str): The name of the dataset.
     """
 
+    # MovieLens 100k
     if dataset_name == "ml-100k":
         download_and_extract_from_url("http://files.grouplens.org/datasets/movielens/ml-100k.zip", dataset_name)
+
+    # MovieLens 1M
     elif dataset_name == "ml-1m":
         download_and_extract_from_url("http://files.grouplens.org/datasets/movielens/ml-1m.zip", dataset_name)
+
+    # MovieLens 10M
     elif dataset_name == "ml-10m":
         download_and_extract_from_url("http://files.grouplens.org/datasets/movielens/ml-10m.zip", dataset_name)
         os.rename("data/ml-10M100K", "data/ml-10m")
+
+    # Tripadvisor datasets (gijon, barcelona, madrid, newyork, paris, london)
     elif dataset_name.startswith("tripadvisor"):
         city = dataset_name.split("-")[1]
         download_and_extract_from_url(f"https://zenodo.org/record/5644892/files/{city}.zip?download=1", dataset_name)
         os.rename(f"data/{city}", f"data/{dataset_name}")
+
+    # Douban-Monti
     elif dataset_name == "douban-monti":
         download_and_extract_from_url(
             f"https://github.com/fmonti/mgcnn/blob/master/Data/douban/training_test_dataset.mat?raw=true", dataset_name
         )
+
+    # Netflix Prize
     elif dataset_name == "netflix-prize":
-        if not os.path.exists("data/netflix-prize"):
-            download_and_extract_from_url(
+        download_and_extract_from_url(
             f"https://archive.org/download/nf_prize_dataset.tar/nf_prize_dataset.tar.gz", dataset_name
-            )
-            os.rename("data/download", "data/netflix-prize")
+        )
+        os.rename("data/download", "data/netflix-prize")
+        create_netflix_ratings_csv()
 
-        # Untar training set
-        if not os.path.exists("data/netflix-prize/ratings.csv"):
-            print("Extracting training set...")
-            tar = tarfile.open("data/netflix-prize/training_set.tar")
-            tar.extractall("data/netflix-prize/")
-            tar.close()
-
-            # Merge training set files
-            print("Merging training set files...")
-            with open("data/netflix-prize/ratings.csv", "w") as outfile:
-                outfile.write("user_id,movie_id,rating\n")
-                for filename in os.listdir("data/netflix-prize/training_set"):
-                    print(f"Merging {filename}...", end="\r")
-                    if os.path.isfile(os.path.join("data/netflix-prize/training_set", filename)):
-                        # Open it
-                        with open(os.path.join("data/netflix-prize/training_set", filename)) as infile:
-                            
-                            # The first line is the movie id
-                            movie_id = infile.readline().split(":")[0]
-
-                            # The rest of the lines are the user id and rating
-                            for line in infile:
-                                user_id, rating, _ = line.split(",")
-                                outfile.write(f"{user_id},{movie_id},{rating}\n")
-
-            # Remove everything inside the training_set folder
-            for filename in os.listdir("data/netflix-prize/training_set"):
-                os.remove(os.path.join("data/netflix-prize/training_set", filename))
-            os.rmdir("data/netflix-prize/training_set")
-
+    # Unsupported dataset
     else:
         print("Dataset not supported yet.")
         return
