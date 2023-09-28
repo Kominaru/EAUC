@@ -56,5 +56,5 @@ The following table shows the results of the experiments:
 |---------|------|------------------|-----------|------------------------|
 | Movielens 1M | 0.837 | 1.145 | 0.341 | 0.264 |
 | Movielens 10M | 0.783 | 1.059 | 0.338 | 0.240 |
-| Douban Monti | 0.7387 | 1.6159 | 0.347 | 0.349 |
-| Netflix Prize | 0.865 | 0.865 | 0.000 | 0.000 |
+| Douban Monti | 0.739 | 1.615 | 0.347 | 0.349 |
+| Netflix Prize | 0.842 | ---- | 0.394 | ---- |
