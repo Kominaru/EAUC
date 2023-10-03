@@ -100,18 +100,6 @@ if __name__ == "__main__":
         test_predictions = pd.read_csv(os.path.join(OUTPUT_DIR, model, "test_samples_with_predictions.csv"))
         model_predictions[model] = {"train": train_predictions, "test": test_predictions}
 
-    # Pretty print a table with the AVG-BIAS-AUC for each model
-    print("AVG-BIAS-AUC")
-    print("----------------------------------")
-    print("Model               Train\tTest")
-    for model in models:
-        train_avg_bias_auc = compute_avg_bias_auc(model_predictions[model]["train"], method=auc_method, bins=bins)
-        test_avg_bias_auc = compute_avg_bias_auc(
-            model_predictions[model]["train"], model_predictions[model]["test"], method=auc_method, bins=bins
-        )
-        print(f"{model:<20}{train_avg_bias_auc:.4f}\t{test_avg_bias_auc:.4f}")
-    print("------------")
-
     # Pretty print a table with the RMSE for each model
     print("RMSE")
     print("----------------------------------")
@@ -123,7 +111,19 @@ if __name__ == "__main__":
         test_rmse = (
             (model_predictions[model]["test"]["rating"] - model_predictions[model]["test"]["pred"]) ** 2
         ).mean() ** 0.5
-        print(f"{model:<20}{train_rmse:.4f}\t{test_rmse:.4f}")
+        print(f"{model:<20}{train_rmse:.3f}\t{test_rmse:.3f}")
+    print("------------")
+
+    # Pretty print a table with the AVG-BIAS-AUC for each model
+    print("AVG-BIAS-AUC")
+    print("----------------------------------")
+    print("Model               Train\tTest")
+    for model in models:
+        train_avg_bias_auc = compute_avg_bias_auc(model_predictions[model]["train"], method=auc_method, bins=bins)
+        test_avg_bias_auc = compute_avg_bias_auc(
+            model_predictions[model]["train"], model_predictions[model]["test"], method=auc_method, bins=bins
+        )
+        print(f"{model:<20}{train_avg_bias_auc:.3f}\t{test_avg_bias_auc:.3f}")
     print("------------")
 
     # Plot the train error by distance to the average rating for each model

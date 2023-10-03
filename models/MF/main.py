@@ -12,13 +12,13 @@ from os import path
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
     dataset_name="netflix-prize",
-    embedding_dim=8,
+    embedding_dim=512,
     data_dir="data",
     max_epochs=1000,
     batch_size=2**14,
     num_workers=4,
     l2_reg=1e-5,
-    learning_rate=5e-4,
+    learning_rate=1e-3,
 ):
     """
     Trains a collaborative filtering model for regression over a dyadic dataset.

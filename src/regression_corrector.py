@@ -71,8 +71,10 @@ Linear equation:
         pred = {lr.intercept_:.3f} + {lr.coef_[0]:.3f} * rating + {lr.coef_[1]:.3f} * user_avg_rating + {lr.coef_[2]:.3f} * item_avg_rating"""
 )
 
+print("Correcting predictions...")
 
-def correct_prediction(sample, lr):
+
+def correct_predictions(sample, lr):
     """
     Return the corrected prediction of a sample using the linear regression by solving the equation for rating.
     Original prediction: pred = a + b * rating + c * user_avg_rating + d * item_avg_rating
@@ -86,26 +88,31 @@ def correct_prediction(sample, lr):
         The corrected prediction (predicted rating) clipped to the range [1, 5]
     """
 
-    corrected_pred = (
+    corrected_pred = np.clip(
         (
-            sample["pred"]
+            sample["pred"].values
             - lr.intercept_
-            - lr.coef_[1] * sample["user_avg_rating"]
-            - lr.coef_[2] * sample["item_avg_rating"]
+            - lr.coef_[1] * sample["user_avg_rating"].values
+            - lr.coef_[2] * sample["item_avg_rating"].values
         )
-        / lr.coef_[0]
-    ).clip(1, 5)
+        / lr.coef_[0],
+        1,
+        5,
+    )
 
     return corrected_pred
 
 
-train_samples["pred"] = train_samples.apply(correct_prediction, args=[lr], axis=1)
-test_samples["pred"] = test_samples.apply(correct_prediction, args=[lr], axis=1)
+train_samples["pred"] = correct_predictions(train_samples, lr)
+test_samples["pred"] = correct_predictions(test_samples, lr)
+
 
 train_samples = train_samples[["user_id", "item_id", "rating", "pred"]]
 test_samples = test_samples[["user_id", "item_id", "rating", "pred"]]
 
 os.makedirs(f"outputs/{MODEL_NAME}_correction_lr", exist_ok=True)
+
+print("Saving corrected predictions...")
 
 train_samples.to_csv(f"outputs/{MODEL_NAME}_correction_lr/train_samples.csv", index=False)
 test_samples.to_csv(f"outputs/{MODEL_NAME}_correction_lr/test_samples_with_predictions.csv", index=False)
