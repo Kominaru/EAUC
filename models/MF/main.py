@@ -11,11 +11,11 @@ from os import path
 
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
-    dataset_name="netflix-prize",
-    embedding_dim=512,
+    dataset_name="ml-100k",
+    embedding_dim=8,
     data_dir="data",
     max_epochs=1000,
-    batch_size=2**14,
+    batch_size=2**10,
     num_workers=4,
     l2_reg=1e-5,
     learning_rate=1e-3,
@@ -63,13 +63,13 @@ def train_MF(
     # Load the best model from the checkpoint
     model = model.load_from_checkpoint("models/MF/checkpoints/best-model.ckpt")
 
-    # Save the train samples and predictions
-    train_samples_df = pd.DataFrame(columns=["user_id", "item_id", "rating", "pred"])
     train_dataloader = torch.utils.data.DataLoader(
         data_module.train_dataset, batch_size=2**15, shuffle=False, num_workers=4
     )
 
+    train_samples_data = []
     predictions = trainer.predict(model, dataloaders=train_dataloader)
+
     for batch, batch_predictions in zip(train_dataloader, predictions):
         user_ids, item_ids, ratings = batch
         rating_preds = batch_predictions.numpy()
@@ -83,11 +83,14 @@ def train_MF(
             }
         )
 
-        train_samples_df = pd.concat([train_samples_df, batch_df])
+        train_samples_data.append(batch_df)
+
+    train_samples_df = pd.concat(train_samples_data, ignore_index=True)
 
     # Save the test samples and predictions
-    test_samples_df = pd.DataFrame(columns=["user_id", "item_id", "rating", "pred"])
+    test_samples_data = []
     predictions = trainer.predict(model, dataloaders=data_module.test_dataloader())
+
     for batch, batch_predictions in zip(data_module.test_dataloader(), predictions):
         user_ids, item_ids, ratings = batch
         rating_preds = batch_predictions.numpy()
@@ -101,8 +104,9 @@ def train_MF(
             }
         )
 
-        test_samples_df = pd.concat([test_samples_df, batch_df])
+        test_samples_data.append(batch_df)
 
+    test_samples_df = pd.concat(test_samples_data, ignore_index=True)
     # Save the train and test samples with predictions
     os.makedirs("outputs/MF", exist_ok=True)
     train_samples_df.to_csv("outputs/MF/train_samples.csv", index=False)
@@ -118,7 +122,7 @@ def train_MF(
 
 
 if __name__ == "__main__":
-    MODE = "train"
+    MODE = "tune"
 
     if MODE == "train":
         train_MF()
@@ -126,7 +130,7 @@ if __name__ == "__main__":
     elif MODE == "tune":
         embedding_dims = [8, 32, 128, 512, 1024]
         l2_regs = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-        learning_rates = [1e-5, 1e-4, 5e-4, 1e-3]
+        learning_rates = [5e-4, 1e-3]
 
         # Choose n random hyperparameter combinations
         NUM_TRIALS = 50

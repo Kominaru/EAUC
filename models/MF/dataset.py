@@ -25,8 +25,8 @@ def load_and_format_tripadvisor_data(dataset_name):
     # Drop items with less than 100 ratings and users with less than 20 ratings
     # Remove repeated user-item pairs
     df = df.drop_duplicates(subset=["user_id", "item_id"], keep="first")
-    df = df.groupby("item_id").filter(lambda x: len(x) >= 20)
-    df = df.groupby("user_id").filter(lambda x: len(x) >= 5)
+    df = df.groupby("item_id").filter(lambda x: len(x) >= 10)
+    df = df.groupby("user_id").filter(lambda x: len(x) >= 10)
 
     # Remove NA values
     df = df.dropna()
@@ -50,8 +50,10 @@ def load_and_format_movielens_data(dataset_name):
     Returns:
         pandas.DataFrame: DataFrame containing the formatted dataset with the columns ['user_id', 'item_id', 'rating']
     """
-
-    df = pd.read_csv(os.path.join("data", dataset_name, "ratings.dat"), sep="::", engine="python", header=None)
+    if dataset_name == "ml-100k":
+        df = pd.read_csv(os.path.join("data", dataset_name, "u.data"), sep="\t", header=None)
+    elif dataset_name in ["ml-1m", "ml-10m"]:
+        df = pd.read_csv(os.path.join("data", dataset_name, "ratings.dat"), sep="::", engine="python", header=None)
     df.columns = ["user_id", "item_id", "rating", "timestamp"]
     df = df[["user_id", "item_id", "rating"]]
 
