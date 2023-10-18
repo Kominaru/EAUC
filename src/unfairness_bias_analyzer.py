@@ -81,9 +81,43 @@ def compute_rmse(train_samples: pd.DataFrame, test_samples: pd.DataFrame):
     rmse = ((train_samples["rating"] - train_samples["pred"]) ** 2).mean() ** 0.5
     print(f"    Train: {rmse:.3f}")
 
+    # Compute the RMSE by rating on the train set
+    for rating in train_samples["rating"].unique():
+        rmse = (
+            (
+                train_samples[train_samples["rating"] == rating]["rating"]
+                - train_samples[train_samples["rating"] == rating]["pred"]
+            )
+            ** 2
+        ).mean() ** 0.5
+        print(f"        Rating {rating}: {rmse:.3f}")
+
     # Compute the RMSE on the test set
     rmse = ((test_samples["rating"] - test_samples["pred"]) ** 2).mean() ** 0.5
     print(f"    Test:  {rmse:.3f}")
+
+    # Compute the RMSE by rating on the test set
+    for rating in test_samples["rating"].unique():
+        rmse = (
+            (
+                test_samples[test_samples["rating"] == rating]["rating"]
+                - test_samples[test_samples["rating"] == rating]["pred"]
+            )
+            ** 2
+        ).mean() ** 0.5
+        print(f"        Rating {rating}: {rmse:.3f}")
+
+    # Compute the RMSE (global and by rating) using a random baseline
+    random_preds = np.random.uniform(low=1.0, high=5.0, size=len(test_samples))
+    rmse = ((test_samples["rating"] - random_preds) ** 2).mean() ** 0.5
+    print(f"    Random baseline: {rmse:.3f}")
+
+    for rating in test_samples["rating"].unique():
+        rmse = (
+            (test_samples[test_samples["rating"] == rating]["rating"] - random_preds[test_samples["rating"] == rating])
+            ** 2
+        ).mean() ** 0.5
+        print(f"        Rating {rating}: {rmse:.3f}")
 
 
 def plot_model_prediction_analysis(train_samples, test_samples):

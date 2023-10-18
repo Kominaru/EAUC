@@ -11,11 +11,11 @@ from os import path
 
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
-    dataset_name="ml-100k",
-    embedding_dim=8,
+    dataset_name="netflix-prize",
+    embedding_dim=512,
     data_dir="data",
     max_epochs=1000,
-    batch_size=2**10,
+    batch_size=2**15,
     num_workers=4,
     l2_reg=1e-5,
     learning_rate=1e-3,
@@ -118,11 +118,15 @@ def train_MF(
     rmse = ((test_samples_df["rating"] - test_samples_df["pred"]) ** 2).mean() ** 0.5
     print(f"Test RMSE:  {rmse:.3f}")
 
+    # Append the hyperparameters and RMSE to a file
+    with open("outputs/MF/results.txt", "a") as f:
+        f.write(f"embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}, rmse={rmse}\n")
+
     return rmse
 
 
 if __name__ == "__main__":
-    MODE = "tune"
+    MODE = "train"
 
     if MODE == "train":
         train_MF()
@@ -145,13 +149,8 @@ if __name__ == "__main__":
 
             rmse = train_MF(embedding_dim=embedding_dim, l2_reg=l2_reg, learning_rate=learning_rate)
 
-            results_df.append([embedding_dim, l2_reg, learning_rate, rmse])
-
             print("==============================================")
             print(f"Trial {i+1}/{NUM_TRIALS} completed")
             print(f"Hyperparameters: embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}")
             print(f"RMSE: {rmse:.3f}")
             print("==============================================")
-
-        results_df = pd.DataFrame(results_df, columns=["embedding_dim", "l2_reg", "learning_rate", "rmse"])
-        results_df.to_csv("outputs/MF/tune_results.csv", index=False)

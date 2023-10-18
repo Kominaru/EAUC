@@ -12,6 +12,7 @@ def compute_avg_bias_auc(
     train_samples: pd.DataFrame,
     test_samples: pd.DataFrame = None,
     method: Literal["bins", "ordered", "grouped"] = None,
+    tails: Literal[1, 2] = 2,
     bins: int = 100,
 ) -> float:
     """
@@ -22,6 +23,7 @@ def compute_avg_bias_auc(
             - 'bins': compute the AVG-BIAS-AUC by dividing the x-axis into bins of equal width and computing the mean error in each bin
             - 'ordered': compute the AVG-BIAS-AUC by ordering the samples by the x-axis
             - 'grouped': same as 'ordered', but first the samples are grouped by their x-axis value and the mean error is computed for each group
+        - tails (int): whether to consider a double-tailed or single-tailed AVG-BIAS-AUC (i.e., whether to consider the absolute value of the distance or not)
         - bins (int): number of bins to use if method is 'bins'
     - Returns:
         - AVG-BIAS-AUC
@@ -49,13 +51,18 @@ def compute_avg_bias_auc(
         test_samples["rating"] - (test_samples["user_avg_rating"] + test_samples["item_avg_rating"]) / 2
     )
 
+    if tails == 1:
+        test_samples["user_rating_avg_dist"] = test_samples["user_rating_avg_dist"].abs()
+
     test_samples["error"] = (test_samples["rating"] - test_samples["pred"]).abs()
 
     # Option 1) Compute the AVG-BIAS-AUC by dividing the x-axis into bins of
     # equal width and computing the mean error in each bin
     if method == "bins":
+        left = -(test_samples["rating"].max() - test_samples["rating"].min()) if tails == 2 else 0
+
         bins = np.linspace(
-            -(test_samples["rating"].max() - test_samples["rating"].min()),
+            left,
             +(test_samples["rating"].max() - test_samples["rating"].min()),
             bins,
         )
