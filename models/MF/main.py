@@ -11,13 +11,13 @@ from os import path
 
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
-    dataset_name="netflix-prize",
-    embedding_dim=512,
+    dataset_name="ml-1m",
+    embedding_dim=512,  # 128 for tripadvisor-london, 8 for douban-monti, 512 for the rest
     data_dir="data",
     max_epochs=1000,
     batch_size=2**15,
     num_workers=4,
-    l2_reg=1e-5,
+    l2_reg=1e-4,  # 1e-4 for tripadvisor-london
     learning_rate=1e-3,
 ):
     """

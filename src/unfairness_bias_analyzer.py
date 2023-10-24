@@ -13,7 +13,7 @@ import warnings
 # Supress FixedFormatter FixedLocator warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
-MODEL_NAME = "MF"
+MODEL_NAME = "GLOCAL_K_correction_lr"
 
 os.makedirs(f"figures/{MODEL_NAME}/", exist_ok=True)
 

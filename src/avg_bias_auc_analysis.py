@@ -13,7 +13,14 @@ OUTPUT_DIR = "outputs/"
 
 COLORS = {
     "MF": "red",
+    "MF_correction_lr": "lightcoral",
     "random": "gray",
+    "GLOCAL_K": "blue",
+    "GLOCAL_K_correction_lr": "lightblue",
+    "GC_MC": "green",
+    "GC_MC_correction_lr": "lightgreen",
+    "BAYESIAN_SVD++": "brown",
+    "BAYESIAN_SVD++_correction_lr": "burlywood",
 }
 
 
@@ -74,7 +81,9 @@ def plot_avg_bias_error(
             return ((df["rating"] - df["pred"]) ** 2).mean() ** 0.5
 
         # Cut into bins by the distance and compute the RMSE in each bin
-        errors_by_dist = test_samples.groupby(pd.cut(test_samples["dist_to_avg_rating"], bins)).apply(group_rmse)
+        # errors_by_dist = test_samples.groupby(pd.cut(test_samples["dist_to_avg_rating"], bins)).apply(group_rmse)
+        # Compute the MAE in each bin
+        errors_by_dist = test_samples.groupby(pd.cut(test_samples["dist_to_avg_rating"], bins))["error"].mean()
 
         errors_by_dist = errors_by_dist[~errors_by_dist.isna()]
 
@@ -218,9 +227,9 @@ if __name__ == "__main__":
             train_predictions = pd.read_csv(os.path.join(OUTPUT_DIR, model, "train_samples.csv"))
             test_predictions = pd.read_csv(os.path.join(OUTPUT_DIR, model, "test_samples_with_predictions.csv"))
             model_predictions[model] = {"train": train_predictions, "test": test_predictions}
-            plot_ratings_vs_preds_lineplot(
-                train_predictions, test_predictions, user_avg_rating_range=(4.5, 5.0), item_avg_rating_range=(4.5, 5.0)
-            )
+            # plot_ratings_vs_preds_lineplot(
+            #     train_predictions, test_predictions, user_avg_rating_range=(4.5, 5.0), item_avg_rating_range=(4.5, 5.0)
+            # )
 
     if "random" in models:
         # Load the samples of a different model to compute the random predictions
