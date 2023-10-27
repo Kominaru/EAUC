@@ -47,103 +47,55 @@ test_samples = test_samples[
 # Linear regression corrector
 #############################
 
-# lr = LinearRegression()
+lr = LinearRegression()
 
-# if REGRESSION_MODE == "train":
-#     lr.fit(train_samples[["rating", "user_avg_rating", "item_avg_rating"]], train_samples["pred"])
+if REGRESSION_MODE == "train":
+    lr.fit(train_samples[["rating", "user_avg_rating", "item_avg_rating"]], train_samples["pred"])
 
-# elif REGRESSION_MODE == "test_probe":
-#     # Extract a probe set from the test set
-#     test_probe = test_samples.sample(frac=1 / 5, random_state=0)
-#     test_samples = test_samples.drop(test_probe.index)
+elif REGRESSION_MODE == "test_probe":
+    # Extract a probe set from the test set
+    test_probe = test_samples.sample(frac=1 / 5, random_state=0)
+    test_samples = test_samples.drop(test_probe.index)
 
-#     # Add to the probe set a number of samples from the train set equal to the number of samples in the probe set
-#     # train_probe = train_samples.sample(n=len(test_probe), random_state=0)
-#     # test_probe = pd.concat([test_probe, train_probe])
+    # Add to the probe set a number of samples from the train set equal to the number of samples in the probe set
+    train_probe = train_samples.sample(n=len(test_probe), random_state=0)
+    test_probe = pd.concat([test_probe, train_probe])
 
-#     # Fit the linear regression on the probe set
-#     lr.fit(test_probe[["rating", "user_avg_rating", "item_avg_rating"]], test_probe["pred"])
+    # Fit the linear regression on the probe set
+    lr.fit(test_probe[["rating", "user_avg_rating", "item_avg_rating"]], test_probe["pred"])
 
-# print(
-#     f"""
-# ==============================
-# Linear equation:
-#         pred = {lr.intercept_:.3f} + {lr.coef_[0]:.3f} * rating + {lr.coef_[1]:.3f} * user_avg_rating + {lr.coef_[2]:.3f} * item_avg_rating"""
-# )
-
-# print("Correcting predictions...")
-
-
-# def correct_predictions(sample, lr):
-#     """
-#     Return the corrected prediction of a sample using the linear regression by solving the equation for rating.
-#     Original prediction: pred = a + b * rating + c * user_avg_rating + d * item_avg_rating
-#     Solveing rating: rating = (pred - a - c * user_avg_rating - d * item_avg_rating) / b
-
-#     Params:
-#         sample: A Pandas Row with the columns "rating", "user_avg_rating", "item_avg_rating" and "pred"
-#         lr: the linear regression model
-
-#     Returns:
-#         The corrected prediction (predicted rating) clipped to the range [1, 5]
-#     """
-
-#     corrected_pred = np.clip(
-#         (
-#             sample["pred"].values
-#             - lr.intercept_
-#             - lr.coef_[1] * sample["user_avg_rating"].values
-#             - lr.coef_[2] * sample["item_avg_rating"].values
-#         )
-#         / lr.coef_[0],
-#         1,
-#         5,
-#     )
-
-#     return corrected_pred
-
-#############################
-# STRATIFIED REGRESSION
-#############################
-
-# Bin the samples by the average rating of the user and the item (10 intervals in the range [0, 5]) and convert to categorical integers
-train_samples["user_bin"] = (2 * train_samples["user_avg_rating"]).apply(int)
-train_samples["item_bin"] = (2 * train_samples["item_avg_rating"]).apply(int)
-train_samples["ui_bin"] = train_samples["user_bin"] * 10 + train_samples["item_bin"]
-
-test_samples["user_bin"] = (2 * test_samples["user_avg_rating"]).apply(int)
-test_samples["item_bin"] = (2 * test_samples["item_avg_rating"]).apply(int)
-test_samples["ui_bin"] = test_samples["user_bin"] * 10 + test_samples["item_bin"]
-
-# Create a dummy variable for each bin by iterating over the bins and creating a new column for each bin
-for i in range(10 * 10):
-    train_samples[f"bin_{i}"] = (train_samples["ui_bin"] == i).apply(int)
-    train_samples[f"bin_{i}_r"] = (train_samples["ui_bin"] == i) * train_samples["rating"]
-    test_samples[f"bin_{i}"] = (test_samples["ui_bin"] == i).apply(int)
-    test_samples[f"bin_{i}_r"] = (test_samples["ui_bin"] == i) * test_samples["rating"]
-
-lr = LinearRegression(fit_intercept=False)
-
-test_probe = test_samples.sample(frac=1 / 5, random_state=0)
-test_samples = test_samples.drop(test_probe.index)
-
-# Learn a linear regression model using all the bin_i and bin_i_r columns as features, and the pred column as target
-lr.fit(
-    train_samples[[f"bin_{i}" for i in range(10 * 10)] + [f"bin_{i}_r" for i in range(10 * 10)]],
-    train_samples["pred"],
+print(
+    f"""
+==============================
+Linear equation:
+        pred = {lr.intercept_:.3f} + {lr.coef_[0]:.3f} * rating + {lr.coef_[1]:.3f} * user_avg_rating + {lr.coef_[2]:.3f} * item_avg_rating"""
 )
+
+print("Correcting predictions...")
 
 
 def correct_predictions(sample, lr):
     """
     Return the corrected prediction of a sample using the linear regression by solving the equation for rating.
-    Original prediction: pred = b_n_r*r + b_n (where n is the bin number)
-    Solveing rating: rating = (pred - b_n) / b_n_r
+    Original prediction: pred = a + b * rating + c * user_avg_rating + d * item_avg_rating
+    Solveing rating: rating = (pred - a - c * user_avg_rating - d * item_avg_rating) / b
+
+    Params:
+        sample: A Pandas Row with the columns "rating", "user_avg_rating", "item_avg_rating" and "pred"
+        lr: the linear regression model
+
+    Returns:
+        The corrected prediction (predicted rating) clipped to the range [1, 5]
     """
 
     corrected_pred = np.clip(
-        (sample["pred"].values - sample[[f"bin_{i}" for i in range(10 * 10)]].values @ lr.coef_[: 10 * 10])
-        / (sample[[f"bin_{i}" for i in range(10 * 10)]].values @ lr.coef_[10 * 10 :]),
+        (
+            sample["pred"].values
+            - lr.intercept_
+            - lr.coef_[1] * sample["user_avg_rating"].values
+            - lr.coef_[2] * sample["item_avg_rating"].values
+        )
+        / lr.coef_[0],
         1,
         5,
     )
@@ -151,8 +103,56 @@ def correct_predictions(sample, lr):
     return corrected_pred
 
 
-print(train_samples.head(5))
-print(train_samples.columns.to_list())
+#############################
+# STRATIFIED REGRESSION
+#############################
+
+# # Bin the samples by the average rating of the user and the item (10 intervals in the range [0, 5]) and convert to categorical integers
+# train_samples["user_bin"] = (2 * train_samples["user_avg_rating"]).apply(int)
+# train_samples["item_bin"] = (2 * train_samples["item_avg_rating"]).apply(int)
+# train_samples["ui_bin"] = train_samples["user_bin"] * 10 + train_samples["item_bin"]
+
+# test_samples["user_bin"] = (2 * test_samples["user_avg_rating"]).apply(int)
+# test_samples["item_bin"] = (2 * test_samples["item_avg_rating"]).apply(int)
+# test_samples["ui_bin"] = test_samples["user_bin"] * 10 + test_samples["item_bin"]
+
+# # Create a dummy variable for each bin by iterating over the bins and creating a new column for each bin
+# for i in range(10 * 10):
+#     train_samples[f"bin_{i}"] = (train_samples["ui_bin"] == i).apply(int)
+#     train_samples[f"bin_{i}_r"] = (train_samples["ui_bin"] == i) * train_samples["rating"]
+#     test_samples[f"bin_{i}"] = (test_samples["ui_bin"] == i).apply(int)
+#     test_samples[f"bin_{i}_r"] = (test_samples["ui_bin"] == i) * test_samples["rating"]
+
+# lr = LinearRegression(fit_intercept=False)
+
+# test_probe = test_samples.sample(frac=1 / 5, random_state=0)
+# test_samples = test_samples.drop(test_probe.index)
+# # train_probe = train_samples.sample(n=len(test_probe), random_state=0)
+# # test_probe = pd.concat([test_probe, train_probe])
+
+# # Learn a linear regression model using all the bin_i and bin_i_r columns as features, and the pred column as target
+# lr.fit(
+#     test_probe[[f"bin_{i}" for i in range(10 * 10)] + [f"bin_{i}_r" for i in range(10 * 10)]],
+#     test_probe["pred"],
+# )
+
+
+# def correct_predictions(sample, lr):
+#     """
+#     Return the corrected prediction of a sample using the linear regression by solving the equation for rating.
+#     Original prediction: pred = b_n_r*r + b_n (where n is the bin number)
+#     Solveing rating: rating = (pred - b_n) / b_n_r
+#     """
+
+#     corrected_pred = np.clip(
+#         (sample["pred"].values - sample[[f"bin_{i}" for i in range(10 * 10)]].values @ lr.coef_[: 10 * 10])
+#         / (sample[[f"bin_{i}" for i in range(10 * 10)]].values @ lr.coef_[10 * 10 :]),
+#         1,
+#         5,
+#     )
+
+#     return corrected_pred
+
 
 train_samples["pred"] = correct_predictions(train_samples, lr)
 test_samples["pred"] = correct_predictions(test_samples, lr)

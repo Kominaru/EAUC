@@ -94,14 +94,14 @@ def plot_avg_bias_error(
         plt.plot(xx, yy, label=model_name, color=COLORS[model_name])
 
         # Plot the RMSE of the model on the whole set as a horizontal line
-        plt.plot(
-            [xx.min(), xx.max()],
-            [group_rmse(test_samples), group_rmse(test_samples)],
-            label=f"{model_name} (overall RMSE)",
-            color=COLORS[model_name],
-            linestyle="--",
-            alpha=0.5,
-        )
+        # plt.plot(
+        #     [xx.min(), xx.max()],
+        #     [group_rmse(test_samples), group_rmse(test_samples)],
+        #     label=f"{model_name} (overall RMSE)",
+        #     color=COLORS[model_name],
+        #     linestyle="--",
+        #     alpha=0.5,
+        # )
 
     # Plot the box that represents the maximum area of error. This box has a width of 2*(max_dist - min_dist) and a height of 2*(max_rating-min_rating)
     max_dist = test_samples["dist_to_avg_rating"].max()
@@ -278,11 +278,12 @@ if __name__ == "__main__":
     print("------------")
 
     # Plot the train error by distance to the average rating for each model
-    plot_avg_bias_error({model: model_predictions[model]["train"] for model in models}, num_bins=25)
+    plot_avg_bias_error({model: model_predictions[model]["train"] for model in models}, num_bins=25, tails=tails)
 
     # Plot the test error by distance to the average rating for each model
     plot_avg_bias_error(
         {model: model_predictions[model]["train"] for model in models},
         {model: model_predictions[model]["test"] for model in models},
         num_bins=25,
+        tails=tails,
     )
