@@ -45,53 +45,78 @@ def plot_avg_bias_error(
     set_string = "Train" if test_samples_dict is None else "Test"
     test_samples_dict = test_samples_dict or train_samples_dict
 
+    plt.figure(figsize=(5, 5))
     for model_name in train_samples_dict:
-        train_samples = train_samples_dict[model_name]
-        test_samples = test_samples_dict[model_name]
+        xx = []
+        yy = []
+        for i in range(len(train_samples_dict[model_name])):
+            train_samples = train_samples_dict[model_name][i]
+            test_samples = test_samples_dict[model_name][i]
 
-        # Map each sample to its user and item average rating
-        test_samples["user_avg_rating"] = test_samples["user_id"].map(
-            train_samples.groupby("user_id")["rating"].mean()
-        )
-        test_samples["item_avg_rating"] = test_samples["item_id"].map(
-            train_samples.groupby("item_id")["rating"].mean()
-        )
+            # Map each sample to its user and item average rating
+            test_samples["user_avg_rating"] = test_samples["user_id"].map(
+                train_samples.groupby("user_id")["rating"].mean()
+            )
+            test_samples["item_avg_rating"] = test_samples["item_id"].map(
+                train_samples.groupby("item_id")["rating"].mean()
+            )
 
-        # Compute the distance from the real rating to the average of the user and item average ratings
+            # Compute the distance from the real rating to the average of the user and item average ratings
 
-        test_samples["dist_to_avg_rating"] = (
-            test_samples["rating"] - (test_samples["user_avg_rating"] + test_samples["item_avg_rating"]) / 2
-        )
+            test_samples["dist_to_avg_rating"] = (
+                test_samples["rating"] - (test_samples["user_avg_rating"] + test_samples["item_avg_rating"]) / 2
+            )
 
-        if tails == 1:
-            test_samples["dist_to_avg_rating"] = test_samples["dist_to_avg_rating"].abs()
+            if tails == 1:
+                test_samples["dist_to_avg_rating"] = test_samples["dist_to_avg_rating"].abs()
 
-        # Compute the error of the model
-        test_samples["error"] = (test_samples["rating"] - test_samples["pred"]).abs()
+            # Compute the error of the model
+            test_samples["error"] = (test_samples["rating"] - test_samples["pred"]).abs()
 
-        left = -(test_samples["rating"].max() - test_samples["rating"].min()) if tails == 2 else 0
+            left = -(test_samples["rating"].max() - test_samples["rating"].min()) if tails == 2 else 0
 
-        bins = np.linspace(
-            left,
-            +(test_samples["rating"].max() - test_samples["rating"].min()),
-            num_bins,
-        )
+            bins = np.linspace(
+                left,
+                (test_samples["rating"].max() - test_samples["rating"].min()),
+                num_bins,
+            )
 
-        def group_rmse(df):
-            return ((df["rating"] - df["pred"]) ** 2).mean() ** 0.5
+            def group_rmse(df):
+                return ((df["rating"] - df["pred"]) ** 2).mean() ** 0.5
 
-        # Cut into bins by the distance and compute the RMSE in each bin
-        # errors_by_dist = test_samples.groupby(pd.cut(test_samples["dist_to_avg_rating"], bins)).apply(group_rmse)
-        # Compute the MAE in each bin
-        errors_by_dist = test_samples.groupby(pd.cut(test_samples["dist_to_avg_rating"], bins))["error"].mean()
+            # Cut into bins by the distance and compute the RMSE in each bin
+            # errors_by_dist = test_samples.groupby(pd.cut(test_samples["dist_to_avg_rating"], bins)).apply(group_rmse)
+            # Compute the MAE in each bin
+            errors_by_dist = test_samples.groupby(pd.cut(test_samples["dist_to_avg_rating"], bins))["error"].mean()
 
-        errors_by_dist = errors_by_dist[~errors_by_dist.isna()]
+            errors_by_dist = errors_by_dist[~errors_by_dist.isna()]
 
-        xx = errors_by_dist.index.to_series().apply(lambda x: x.mid)
-        yy = errors_by_dist.values
+            xx+=(errors_by_dist.index.to_series().apply(lambda x: x.mid).to_list())
+            yy+=(errors_by_dist.values.tolist())
+
+        df = pd.DataFrame({"xx": xx, "yy": yy})
+        # Compute the mean and standard deviation of the error in each bin
+        df = df.groupby("xx")["yy"].agg(["mean", "std"])
+        df.dropna(inplace=True)
+
+        xx = df.index
+        yy = df["mean"]
+                 
+        # Make axes square
+        
+
 
         # Plot the error by distance
         plt.plot(xx, yy, label=model_name, color=COLORS[model_name])
+
+        # Plot the standard deviation of the error in each bin as a shaded area
+        plt.fill_between(
+            xx,
+            yy - df["std"],
+            yy + df["std"],
+            alpha=0.2,
+            color=COLORS[model_name],
+        )
 
         # Plot the RMSE of the model on the whole set as a horizontal line
         # plt.plot(
@@ -109,20 +134,24 @@ def plot_avg_bias_error(
     max_rating = test_samples["rating"].max()
     min_rating = test_samples["rating"].min()
 
+    # Plot y=x
+    plt.plot([0, (max_rating - min_rating)], [0, (max_rating - min_rating)], color="black", alpha=0.2)
+        
+
     # plt.plot(
     #     [min_dist, min_dist, max_dist, max_dist, min_dist],
     #     [0, (max_rating - min_rating), (max_rating - min_rating), 0, 0],
     #     label="Maximum area",
     # )
 
-    plt.xlim(min_dist, max_dist)
+    plt.xlim(0, (max_rating - min_rating))
     plt.ylim(0, (max_rating - min_rating))
     plt.grid(alpha=0.3)
 
     plt.xlabel("Rating eccentricity $Ecc_{ui}$")
     plt.ylabel("RMSE")
-    plt.title(f"{set_string.capitalize()} RMSE by rating eccentricity")
-    plt.legend()
+    plt.title(f"{set_string.capitalize()} Absolute Error by Rating Eccentricity")
+    plt.legend(loc = "upper left")
 
     plt.savefig(f"outputs/avg_bias_auc_{set_string.lower()}.pdf")
     plt.show()
@@ -207,9 +236,11 @@ def plot_ratings_vs_preds_lineplot(
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--models", nargs="+", type=str, help="List of models to compare")
+    parser.add_argument("--dataset", type=str)
     parser.add_argument("--auc_method", type=str, default="ordered")
     parser.add_argument("--bins", type=int, default=20)
     parser.add_argument("--tails", type=int, default=1)
+    parser.add_argument("--execution", type=int)
     return parser.parse_args()
 
 
@@ -219,13 +250,20 @@ if __name__ == "__main__":
     auc_method = args.auc_method
     bins = args.bins
     tails = args.tails
+    dataset = args.dataset
 
     # Load dataframes for each model
     model_predictions = {}
     for model in models:
         if model != "random":
-            train_predictions = pd.read_csv(os.path.join(OUTPUT_DIR, model, "train_samples.csv"))
-            test_predictions = pd.read_csv(os.path.join(OUTPUT_DIR, model, "test_samples_with_predictions.csv"))
+            train_predictions = []
+            test_predictions = []
+            for i in range(1, 6):
+                train_predictions.append(
+                    pd.read_csv(os.path.join(OUTPUT_DIR, dataset, model, f"train_outputs_{i}.csv"))
+                )
+                test_predictions.append(pd.read_csv(os.path.join(OUTPUT_DIR, dataset, model, f"test_outputs_{i}.csv")))
+
             model_predictions[model] = {"train": train_predictions, "test": test_predictions}
             # plot_ratings_vs_preds_lineplot(
             #     train_predictions, test_predictions, user_avg_rating_range=(4.5, 5.0), item_avg_rating_range=(4.5, 5.0)
@@ -233,16 +271,19 @@ if __name__ == "__main__":
 
     if "random" in models:
         # Load the samples of a different model to compute the random predictions
-        train_predictions = model_predictions[models[0]]["train"].copy()
-        test_predictions = model_predictions[models[0]]["test"].copy()
+        train_predictions = [model_predictions[models[0]]["train"][i].copy() for i in range(len(model_predictions[models[0]]["train"]))]*5
+        test_predictions = [model_predictions[models[0]]["test"][i].copy() for i in range(len(model_predictions[models[0]]["test"]))]*5
 
-        # Compute the random predictions
-        train_predictions["pred"] = np.random.uniform(
-            train_predictions["rating"].min(), train_predictions["rating"].max(), len(train_predictions)
-        )
-        test_predictions["pred"] = np.random.uniform(
-            test_predictions["rating"].min(), test_predictions["rating"].max(), len(test_predictions)
-        )
+        for i in range(len(train_predictions)):
+            
+            # Compute the random predictions
+            train_predictions[i]["pred"] = np.random.uniform(
+                train_predictions[i]["rating"].min(), train_predictions[i]["rating"].max(), len(train_predictions[i])
+            )
+            test_predictions[i]["pred"] = np.random.uniform(
+                test_predictions[i]["rating"].min(), test_predictions[i]["rating"].max(), len(test_predictions[i])
+            )
+
         model_predictions["random"] = {"train": train_predictions, "test": test_predictions}
 
     # Pretty print a table with the RMSE for each model
@@ -250,13 +291,15 @@ if __name__ == "__main__":
     print("----------------------------------")
     print("Model               Train\tTest")
     for model in models:
-        train_rmse = (
-            (model_predictions[model]["train"]["rating"] - model_predictions[model]["train"]["pred"]) ** 2
-        ).mean() ** 0.5
-        test_rmse = (
-            (model_predictions[model]["test"]["rating"] - model_predictions[model]["test"]["pred"]) ** 2
-        ).mean() ** 0.5
-        print(f"{model:<20}{train_rmse:.3f}\t{test_rmse:.3f}")
+        for i in range(len(model_predictions[model]["train"])):
+            
+            train_rmse = (
+                (model_predictions[model]["train"][i]["rating"] - model_predictions[model]["train"][i]["pred"]) ** 2
+            ).mean() ** 0.5
+            test_rmse = (
+                (model_predictions[model]["test"][i]["rating"] - model_predictions[model]["test"][i]["pred"]) ** 2
+            ).mean() ** 0.5
+            print(f"{model:<20}{train_rmse:.3f}\t{test_rmse:.3f}")
     print("------------")
 
     # Pretty print a table with the AVG-BIAS-AUC for each model
@@ -264,17 +307,18 @@ if __name__ == "__main__":
     print("----------------------------------")
     print("Model               Train\tTest")
     for model in models:
-        train_avg_bias_auc = compute_avg_bias_auc(
-            model_predictions[model]["train"], method=auc_method, tails=tails, bins=bins
-        )
-        test_avg_bias_auc = compute_avg_bias_auc(
-            model_predictions[model]["train"],
-            model_predictions[model]["test"],
-            method=auc_method,
-            tails=tails,
-            bins=bins,
-        )
-        print(f"{model:<20}{train_avg_bias_auc:.3f}\t{test_avg_bias_auc:.3f}")
+        for i in range(len(model_predictions[model]["train"])):
+            train_avg_bias_auc = compute_avg_bias_auc(
+                model_predictions[model]["train"][i], method=auc_method, tails=tails, bins=bins
+            )
+            test_avg_bias_auc = compute_avg_bias_auc(
+                model_predictions[model]["train"][i],
+                model_predictions[model]["test"][i],
+                method=auc_method,
+                tails=tails,
+                bins=bins,
+            )
+            print(f"{model:<20}{train_avg_bias_auc:.3f}\t{test_avg_bias_auc:.3f}")
     print("------------")
 
     # Plot the train error by distance to the average rating for each model

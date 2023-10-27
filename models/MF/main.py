@@ -7,18 +7,19 @@ import torch
 from dataset import DyadicRegressionDataModule
 from model import CollaborativeFilteringModel
 from os import path
+from save_model_outputs import save_model_outputs
 
 
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
-    dataset_name="tripadvisor-london",
-    embedding_dim=128,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
+    dataset_name="ml-1m",
+    embedding_dim=512,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
     data_dir="data",
     max_epochs=1000,
     batch_size=2**15,
     num_workers=4,
-    l2_reg=1e-4,  # 1e-4 for tripadvisor-london and ml-100k
-    learning_rate=1e-4,  # 5e-4 for ml-100k
+    l2_reg=1e-5,  # 1e-4 for tripadvisor-london and ml-100k
+    learning_rate=5e-4,  # 5e-4 for ml-100k
 ):
     """
     Trains a collaborative filtering model for regression over a dyadic dataset.
@@ -107,10 +108,9 @@ def train_MF(
         test_samples_data.append(batch_df)
 
     test_samples_df = pd.concat(test_samples_data, ignore_index=True)
+
     # Save the train and test samples with predictions
-    os.makedirs("outputs/MF", exist_ok=True)
-    train_samples_df.to_csv("outputs/MF/train_samples.csv", index=False)
-    test_samples_df.to_csv("outputs/MF/test_samples_with_predictions.csv", index=False)
+    save_model_outputs(train_samples_df, test_samples_df, "MF", dataset_name,{"embedding_dim": embedding_dim, "l2_reg": l2_reg, "learning_rate": learning_rate})
 
     # RMSE
     rmse = ((train_samples_df["rating"] - train_samples_df["pred"]) ** 2).mean() ** 0.5
@@ -119,7 +119,12 @@ def train_MF(
     print(f"Test RMSE:  {rmse:.3f}")
 
     # Append the hyperparameters and RMSE to a file
-    with open("outputs/MF/results.txt", "a") as f:
+    # Create the file if it doesn't exist
+    if not os.path.exists(f"outputs/{dataset_name}/MF/results.txt"):
+        with open(f"outputs/{dataset_name}/MF/results.txt", "w") as f:
+            f.write("")
+            f.close()
+    with open(f"outputs/{dataset_name}/MF/results.txt", "a") as f:
         f.write(f"embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}, rmse={rmse}\n")
 
     return rmse

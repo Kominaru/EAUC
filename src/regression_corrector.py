@@ -7,9 +7,11 @@ from sklearn.linear_model import LinearRegression
 
 MODEL_NAME = "MF"
 REGRESSION_MODE = "test_probe"  # "train" or "test_probe"
+DATASET_NAME = "ml-1m"
+EXECUTION = 1
 
-train_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/train_samples.csv")
-test_samples: pd.DataFrame = pd.read_csv(f"outputs/{MODEL_NAME}/test_samples_with_predictions.csv")
+train_samples: pd.DataFrame = pd.read_csv(f"outputs/{DATASET_NAME}/{MODEL_NAME}/train_outputs_{EXECUTION}.csv")
+test_samples: pd.DataFrame = pd.read_csv(f"outputs/{DATASET_NAME}/{MODEL_NAME}/test_outputs_{EXECUTION}.csv")
 
 all_samples = pd.concat([train_samples, test_samples])
 
@@ -165,8 +167,8 @@ os.makedirs(f"outputs/{MODEL_NAME}_correction_lr", exist_ok=True)
 
 print("Saving corrected predictions...")
 
-train_samples.to_csv(f"outputs/{MODEL_NAME}_correction_lr/train_samples.csv", index=False)
-test_samples.to_csv(f"outputs/{MODEL_NAME}_correction_lr/test_samples_with_predictions.csv", index=False)
+train_samples.to_csv(f"outputs/{DATASET_NAME}/{MODEL_NAME}_correction_lr/train_outputs_{EXECUTION}.csv", index=False)
+test_samples.to_csv(f"outputs/{DATASET_NAME}/{MODEL_NAME}_correction_lr/test_outputs_{EXECUTION}.csv", index=False)
 
 print(f"==============================")
 print(f"Saved corrected Train predictions in outputs/{MODEL_NAME}_correction_lr/train_samples.csv")
