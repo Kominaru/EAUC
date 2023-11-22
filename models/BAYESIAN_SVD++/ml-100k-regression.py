@@ -260,8 +260,13 @@ if __name__ == "__main__":
         callback=callback,
     )
 
-    # Predict test set and compute RMSE
-    y_pred = fm.predict(X_date_test, test_blocks)
+    if ALGORITHM == "regression":
+        # Predict test set and compute RMSE
+        y_pred = fm.predict(X_date_test, test_blocks)
+    else:
+        y_pred = fm.predict_proba(X_date_test, test_blocks)
+        y_pred = y_pred.dot(np.arange(5))
+        y_pred = np.clip(y_pred, 1, 5)
     rmse = np.sqrt(np.mean((y_pred - df_test.rating.values) ** 2))
     print("RMSE = {}".format(rmse))
 
@@ -274,9 +279,21 @@ if __name__ == "__main__":
     df_train.rename(columns={"movie_id": "item_id"}, inplace=True)
 
     # Save the result
-    os.makedirs("outputs/BAYESIAN_SVD++", exist_ok=True)
-    df_train.to_csv("outputs/BAYESIAN_SVD++/train_samples.csv", index=False)
-    df_test.to_csv("outputs/BAYESIAN_SVD++/test_samples_with_predictions.csv", index=False)
+    from save_model_outputs import save_model_outputs
+
+    save_model_outputs(
+        train_df=df_train,
+        test_df=df_test,
+        model_name="BAYESIAN_SVD++",
+        dataset_name="ml-100k",
+        model_params={
+            "iteration": ITERATION,
+            "dimension": DIMENSION,
+            "algorithm": ALGORITHM,
+            "fold_index": FOLD_INDEX,
+            "feature": args.feature,
+        },
+    )
 
     with open("callback_result_{0}_fold_{1}.pkl".format(ALGORITHM, FOLD_INDEX), "wb") as ofs:
         pickle.dump(callback, ofs)

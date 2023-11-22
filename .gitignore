@@ -5,6 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
+*.pkl
 
 figures/
 
@@ -175,3 +176,4 @@ models/MRMA/pmf/weights
 .vscode/settings.json
 **/lightning_logs/
 log/
+callback_result_oprobit_fold_9.pkl

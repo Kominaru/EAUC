@@ -14,6 +14,7 @@ import torch as th
 import torch.nn as nn
 from data import MovieLens
 from model import BiDecoder, GCMCLayer
+from save_model_outputs import save_model_outputs
 from utils import (
     get_activation,
     get_optimizer,
@@ -235,8 +236,21 @@ def train(args):
     # Rename movie_id to item_id
     dataset.train_rating_info.rename(columns={"movie_id": "item_id"}, inplace=True)
     dataset.test_rating_info.rename(columns={"movie_id": "item_id"}, inplace=True)
-    dataset.train_rating_info.to_csv("outputs/GC_MC/train_samples.csv", index=False)
-    dataset.test_rating_info.to_csv("outputs/GC_MC/test_samples_with_predictions.csv", index=False)
+
+    save_model_outputs(
+        train_df=dataset.train_rating_info,
+        test_df=dataset.test_rating_info,
+        model_name="GCMC",
+        dataset_name=args.data_name,
+        model_params={
+            "iteration": args.train_max_iter,
+            "dropout": args.gcn_dropout,
+            "learning_rate": args.train_lr,
+            "basis_functions": args.gen_r_num_basis_func,
+            "gcn_out_units": args.gcn_out_units,
+            "gcn_agg_units": args.gcn_agg_units,
+        },
+    )
 
     train_loss_logger.close()
     valid_loss_logger.close()
@@ -271,7 +285,7 @@ def config():
     parser.add_argument("--gcn_agg_accum", type=str, default="sum")
     parser.add_argument("--gcn_out_units", type=int, default=75)
     parser.add_argument("--gen_r_num_basis_func", type=int, default=2)
-    parser.add_argument("--train_max_iter", type=int, default=2000)
+    parser.add_argument("--train_max_iter", type=int, default=3500)
     parser.add_argument("--train_log_interval", type=int, default=1)
     parser.add_argument("--train_valid_interval", type=int, default=1)
     parser.add_argument("--train_optimizer", type=str, default="adam")
@@ -300,8 +314,8 @@ def config():
 
 if __name__ == "__main__":
     args = config()
-    np.random.seed(args.seed)
-    th.manual_seed(args.seed)
-    if th.cuda.is_available():
-        th.cuda.manual_seed_all(args.seed)
+    # np.random.seed(args.seed)
+    # th.manual_seed(args.seed)
+    # if th.cuda.is_available():
+    #     th.cuda.manual_seed_all(args.seed)
     train(args)

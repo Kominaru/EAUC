@@ -9,6 +9,7 @@ import scipy.sparse as sp
 import torch as th
 from dgl.data.utils import download, extract_archive, get_download_dir
 from utils import to_etype_name
+import h5py
 
 _urls = {
     "ml-100k": "http://files.grouplens.org/datasets/movielens/ml-100k.zip",
@@ -40,6 +41,52 @@ GENRES_ML_100K = [
 ]
 GENRES_ML_1M = GENRES_ML_100K[1:]
 GENRES_ML_10M = GENRES_ML_100K + ["IMAX"]
+
+
+def load_and_format_doubanmonti_data(dataset_name):
+    # Open douban-monti dataset (matlab file) using h5py
+    with h5py.File(os.path.join("data", dataset_name, "training_test_dataset.mat"), "r") as f:
+        # Convert to numpy arrays
+
+        data = np.array(f["M"])
+        train_data = np.array(f["M"]) * np.array(f["Otraining"])
+        test_data = np.array(f["M"]) * np.array(f["Otest"])
+
+    def rating_matrix_to_dataframe(ratings: np.ndarray):
+        """
+        Converts a rating matrix to a pandas DataFrame.
+
+        Args:
+            ratings (np.ndarray): Rating matrix
+
+        Returns:
+            pandas.DataFrame: DataFrame containing the ratings
+        """
+
+        # Get the indices of the non-zero ratings
+        nonzero_indices = np.nonzero(ratings)
+
+        # Create the dataframe
+        df = pd.DataFrame(
+            {
+                "user_id": nonzero_indices[0],
+                "movie_id": nonzero_indices[1],
+                "rating": ratings[nonzero_indices],
+            }
+        )
+
+        # Min and max ratings
+        min_rating = df["rating"].min()
+        max_rating = df["rating"].max()
+
+        return df
+
+    # Convert the training and test data to dataframes
+    all_df = rating_matrix_to_dataframe(data)
+    train_df = rating_matrix_to_dataframe(train_data)
+    test_df = rating_matrix_to_dataframe(test_data)
+
+    return all_df, train_df, test_df
 
 
 class MovieLens(object):
@@ -142,8 +189,7 @@ class MovieLens(object):
         # self._dir = os.path.join(download_dir, name, root_folder)
         self._dir = "data/" + name
         print("Starting processing {} ...".format(self._name))
-        self._load_raw_user_info()
-        self._load_raw_movie_info()
+
         print("......")
         # if self._name == "ml-100k":
         #     self.all_train_rating_info = self._load_raw_rates(
@@ -167,8 +213,14 @@ class MovieLens(object):
             shuffled_idx = np.random.permutation(self.all_rating_info.shape[0])
             self.test_rating_info = self.all_rating_info.iloc[shuffled_idx[:num_test]]
             self.all_train_rating_info = self.all_rating_info.iloc[shuffled_idx[num_test:]]
+        elif self._name == "douban-monti":
+            self.all_rating_info, self.all_train_rating_info, self.test_rating_info = load_and_format_doubanmonti_data(
+                self._name
+            )
         else:
             raise NotImplementedError
+        self._load_raw_user_info()
+        self._load_raw_movie_info()
         print("......")
         num_valid = int(np.ceil(self.all_train_rating_info.shape[0] * self._valid_ratio))
         shuffled_idx = np.random.permutation(self.all_train_rating_info.shape[0])
@@ -518,6 +570,12 @@ class MovieLens(object):
                 np.unique(rating_info["user_id"].values.astype(np.int32)),
                 columns=["id"],
             )
+        elif self._name == "douban-monti":
+            self.user_info = pd.DataFrame(
+                np.unique(self.all_rating_info["user_id"].values.astype(np.int32)),
+                columns=["id"],
+            )
+
         else:
             raise NotImplementedError
 
@@ -593,6 +651,8 @@ class MovieLens(object):
             GENRES = GENRES_ML_1M
         elif self._name == "ml-10m":
             GENRES = GENRES_ML_10M
+        elif self._name == "douban-monti":
+            GENRES = None
         else:
             raise NotImplementedError
 
@@ -636,7 +696,14 @@ class MovieLens(object):
                 assert idx == genre_map[genre_name]
                 movie_info[genre_name] = movie_genres[:, idx]
             self.movie_info = movie_info.drop(columns=["genres"])
+
+        elif self._name == "douban-monti":
+            self.movie_info = pd.DataFrame(
+                np.unique(self.all_rating_info["movie_id"].values.astype(np.int32)),
+                columns=["id"],
+            )
         else:
+            print("name: {}".format(self._name))
             raise NotImplementedError
 
     def _process_movie_fea(self):

@@ -18,6 +18,8 @@ from myfm.utils.callbacks.libfm import (
 )
 from myfm.utils.encoders import CategoryValueToSparseEncoder
 
+from save_model_outputs import save_model_outputs
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="""
@@ -258,22 +260,43 @@ if __name__ == "__main__":
     )
 
     # Predict test set and compute RMSE
-    y_pred = fm.predict(X_date_test, test_blocks, n_workers=8)
+    if ALGORITHM == "regression":
+        y_pred = fm.predict(X_date_test, test_blocks, n_workers=8)
+    else:
+        y_pred = fm.predict_proba(X_date_test, test_blocks, n_workers=8)
+        y_pred = y_pred.dot(np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
+        df_test["rating"] += 1
+
+    df_test["pred"] = y_pred
+
     rmse = np.sqrt(np.mean((y_pred - df_test.rating.values) ** 2))
     print("RMSE = {}".format(rmse))
 
-    # Add pred column to df_test and df_train
-    df_test["pred"] = y_pred
-    df_train["pred"] = fm.predict(X_date_train, train_blocks, n_workers=8)
+    if ALGORITHM == "regression":
+        df_train["pred"] = fm.predict(X_date_train, train_blocks, n_workers=8)
+    else:
+        preds = fm.predict_proba(X_date_train, train_blocks, n_workers=8)
+        preds = preds.dot(np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
+        df_train["pred"] = preds
+        df_train["rating"] += 1
 
     # Change the movie_id column to item_id
     df_test.rename(columns={"movie_id": "item_id"}, inplace=True)
     df_train.rename(columns={"movie_id": "item_id"}, inplace=True)
 
-    # Save the result
-    os.makedirs("outputs/BAYESIAN_SVD++", exist_ok=True)
-    df_train.to_csv("outputs/BAYESIAN_SVD++/train_samples.csv", index=False)
-    df_test.to_csv("outputs/BAYESIAN_SVD++/test_samples_with_predictions.csv", index=False)
+    save_model_outputs(
+        train_df=df_train,
+        test_df=df_test,
+        model_name="BAYESIAN_SVD++",
+        dataset_name="ml-1m",
+        model_params={
+            "iteration": ITERATION,
+            "dimension": DIMENSION,
+            "algorithm": ALGORITHM,
+            "fold_index": FOLD_INDEX,
+            "feature": args.feature,
+        },
+    )
 
     with open("callback_result_{0}_fold_{1}.pkl".format(ALGORITHM, FOLD_INDEX), "wb") as ofs:
         pickle.dump(callback, ofs)

@@ -14,7 +14,13 @@ class CollaborativeFilteringModel(LightningModule):
     """
 
     def __init__(
-        self, num_users: int, num_items: int, embedding_dim: int = 100, lr: float = 5e-4, l2_reg: float = 1e-5
+        self,
+        num_users: int,
+        num_items: int,
+        embedding_dim: int = 100,
+        lr: float = 5e-4,
+        l2_reg: float = 1e-5,
+        dropout: float = 0.0,
     ):
         """
         Initializes a Collaborative Filtering model for item ratings prediction
@@ -33,6 +39,9 @@ class CollaborativeFilteringModel(LightningModule):
         self.user_bias = nn.Embedding(num_users, 1)
         self.item_bias = nn.Embedding(num_items, 1)
         self.global_bias = nn.Parameter(torch.tensor(0).float())
+
+        self.user_dropout = nn.Dropout(dropout)
+        self.item_dropout = nn.Dropout(dropout)
 
         self.lr = lr
         self.l2_reg = l2_reg
@@ -57,6 +66,9 @@ class CollaborativeFilteringModel(LightningModule):
     def forward(self, user_ids, item_ids):
         user_embeds = self.user_embedding(user_ids)
         item_embeds = self.item_embedding(item_ids)
+
+        user_embeds = self.user_dropout(user_embeds)
+        item_embeds = self.item_dropout(item_embeds)
 
         dot_product = torch.sum(user_embeds * item_embeds, dim=1, keepdim=True)
 

@@ -12,14 +12,15 @@ from save_model_outputs import save_model_outputs
 
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
-    dataset_name="ml-1m",
-    embedding_dim=512,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
+    dataset_name="netflix-prize",
+    embedding_dim=128,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
     data_dir="data",
     max_epochs=1000,
     batch_size=2**15,
     num_workers=4,
     l2_reg=1e-5,  # 1e-4 for tripadvisor-london and ml-100k
-    learning_rate=5e-4,  # 5e-4 for ml-100k
+    learning_rate=1e-3,  # 5e-4 for ml-100k
+    dropout=0.0,
 ):
     """
     Trains a collaborative filtering model for regression over a dyadic dataset.
@@ -32,7 +33,12 @@ def train_MF(
 
     # Initialize the collaborative filtering model
     model = CollaborativeFilteringModel(
-        data_module.num_users, data_module.num_items, embedding_dim=embedding_dim, l2_reg=l2_reg, lr=learning_rate
+        data_module.num_users,
+        data_module.num_items,
+        embedding_dim=embedding_dim,
+        l2_reg=l2_reg,
+        lr=learning_rate,
+        dropout=dropout,
     )
 
     # Initialize early stopping callback
@@ -65,7 +71,7 @@ def train_MF(
     model = model.load_from_checkpoint("models/MF/checkpoints/best-model.ckpt")
 
     train_dataloader = torch.utils.data.DataLoader(
-        data_module.train_dataset, batch_size=2**15, shuffle=False, num_workers=4
+        data_module.train_dataset, batch_size=2**15, shuffle=False, num_workers=4, persistent_workers=True
     )
 
     train_samples_data = []
@@ -110,7 +116,13 @@ def train_MF(
     test_samples_df = pd.concat(test_samples_data, ignore_index=True)
 
     # Save the train and test samples with predictions
-    save_model_outputs(train_samples_df, test_samples_df, "MF", dataset_name,{"embedding_dim": embedding_dim, "l2_reg": l2_reg, "learning_rate": learning_rate})
+    save_model_outputs(
+        train_samples_df,
+        test_samples_df,
+        "MF",
+        dataset_name,
+        {"embedding_dim": embedding_dim, "l2_reg": l2_reg, "learning_rate": learning_rate, "dropout": dropout},
+    )
 
     # RMSE
     rmse = ((train_samples_df["rating"] - train_samples_df["pred"]) ** 2).mean() ** 0.5
@@ -120,12 +132,14 @@ def train_MF(
 
     # Append the hyperparameters and RMSE to a file
     # Create the file if it doesn't exist
-    if not os.path.exists(f"outputs/{dataset_name}/MF/results.txt"):
-        with open(f"outputs/{dataset_name}/MF/results.txt", "w") as f:
-            f.write("")
-            f.close()
-    with open(f"outputs/{dataset_name}/MF/results.txt", "a") as f:
-        f.write(f"embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}, rmse={rmse}\n")
+    # if not os.path.exists(f"outputs/{dataset_name}/MF/resultstune.txt"):
+    #     with open(f"outputs/{dataset_name}/MF/resultstune.txt", "w") as f:
+    #         f.write("")
+    #         f.close()
+    # with open(f"outputs/{dataset_name}/MF/resultstune.txt", "a") as f:
+    #     f.write(
+    #         f"embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}, dropout={dropout} rmse={rmse}\n"
+    #     )
 
     return rmse
 
@@ -139,10 +153,11 @@ if __name__ == "__main__":
     elif MODE == "tune":
         embedding_dims = [8, 32, 128, 512, 1024]
         l2_regs = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-        learning_rates = [5e-4, 1e-3]
+        learning_rates = [1e-3, 5e-4]
+        dropouts = [0.0, 0.2, 0.4, 0.6, 0.8]
 
         # Choose n random hyperparameter combinations
-        NUM_TRIALS = 50
+        NUM_TRIALS = 250
 
         # Create a dataframe to store the results
         results_df = []
@@ -151,11 +166,14 @@ if __name__ == "__main__":
             embedding_dim = random.choice(embedding_dims)
             l2_reg = random.choice(l2_regs)
             learning_rate = random.choice(learning_rates)
+            dropout = random.choice(dropouts)
 
-            rmse = train_MF(embedding_dim=embedding_dim, l2_reg=l2_reg, learning_rate=learning_rate)
+            rmse = train_MF(embedding_dim=embedding_dim, l2_reg=l2_reg, learning_rate=learning_rate, dropout=dropout)
 
             print("==============================================")
             print(f"Trial {i+1}/{NUM_TRIALS} completed")
-            print(f"Hyperparameters: embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}")
+            print(
+                f"Hyperparameters: embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}, dropout={dropout}"
+            )
             print(f"RMSE: {rmse:.3f}")
             print("==============================================")

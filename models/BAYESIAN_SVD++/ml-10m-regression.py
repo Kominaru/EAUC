@@ -18,6 +18,8 @@ from myfm.utils.callbacks.libfm import (
 )
 from myfm.utils.encoders import CategoryValueToSparseEncoder
 
+from save_model_outputs import save_model_outputs
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="""
@@ -276,9 +278,19 @@ if __name__ == "__main__":
     df_train.rename(columns={"movie_id": "item_id"}, inplace=True)
 
     # Save the result
-    os.makedirs("outputs/BAYESIAN_SVD++", exist_ok=True)
-    df_train.to_csv("outputs/BAYESIAN_SVD++/train_samples.csv", index=False)
-    df_test.to_csv("outputs/BAYESIAN_SVD++/test_samples_with_predictions.csv", index=False)
+    save_model_outputs(
+        train_df=df_train,
+        test_df=df_test,
+        model_name="BAYESIAN_SVD++",
+        dataset_name="ml-10m",
+        model_params={
+            "iteration": ITERATION,
+            "dimension": DIMENSION,
+            "algorithm": ALGORITHM,
+            "fold_index": FOLD_INDEX,
+            "feature": args.feature,
+        },
+    )
 
     with open("callback_result_{0}_fold_{1}.pkl".format(ALGORITHM, FOLD_INDEX), "wb") as ofs:
         pickle.dump(callback, ofs)

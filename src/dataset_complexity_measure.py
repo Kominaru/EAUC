@@ -1,12 +1,12 @@
 import pandas as pd
 import numpy as np
-from scipy.stats import uniform, kstest
+from scipy.stats import uniform, kstest, wasserstein_distance
 import tqdm
 import h5py
 import os
 
 # Load dataset
-dataset_name = "tripadvisor-london"
+dataset_name = "netflix-prize"
 
 if dataset_name == "ml-1m":
     df = pd.read_csv("data/ml-1m/ratings.dat", sep="::", engine="python")
@@ -109,22 +109,55 @@ def measure_similarity_to_uniform(data_grouped):
     return (ks_stat, p_value)
 
 
+def wasserstein_distance_to_uniform(data_grouped):
+    """
+    Calculate the Wasserstein distance between the ratings and a uniform distribution
+    """
+    return wasserstein_distance(data_grouped, np.random.uniform(a, b, len(data_grouped)))
+
+
 tqdm.tqdm.pandas()
 
 
+# # Kolmogorov-Smirnov test
+
+# # Measure for each user
+# user_similarity_results = df.groupby("user_id")["rating"].progress_apply(lambda x: measure_similarity_to_uniform(x))
+# avg_ks_users = user_similarity_results.apply(lambda x: x[0]).mean()
+# std_ks_users = user_similarity_results.apply(lambda x: x[0]).std()
+
+# # Measure for each item
+# item_similarity_results = df.groupby("item_id")["rating"].progress_apply(lambda x: measure_similarity_to_uniform(x))
+# avg_ks_items = item_similarity_results.apply(lambda x: x[0]).mean()
+# std_ks_items = item_similarity_results.apply(lambda x: x[0]).std()
+
+# # Concat results and obtain average and std of both ks_stat and p_value
+# all_similarity_results = pd.concat([user_similarity_results, item_similarity_results])
+# avg_ks_all = all_similarity_results.apply(lambda x: x[0]).mean()
+# std_ks_all = all_similarity_results.apply(lambda x: x[0]).std()
+
+
+# print(f"K-S (users): {avg_ks_users:.4f} +- {std_ks_users:.4f}")
+# print(f"K-S (items): {avg_ks_items:.4f} +- {std_ks_items:.4f}")
+# print(f"K-S (all)  : {avg_ks_all:.4f} +- {std_ks_all:.4f}")
+
+# Wasserstein distance
+
 # Measure for each user
-user_similarity_results = df.groupby("user_id")["rating"].progress_apply(lambda x: measure_similarity_to_uniform(x))
+user_similarity_results = df.groupby("user_id")["rating"].progress_apply(lambda x: wasserstein_distance_to_uniform(x))
+avg_wasserstein_users = user_similarity_results.mean()
+std_wasserstein_users = user_similarity_results.std()
 
 # Measure for each item
-item_similarity_results = df.groupby("item_id")["rating"].progress_apply(lambda x: measure_similarity_to_uniform(x))
+item_similarity_results = df.groupby("item_id")["rating"].progress_apply(lambda x: wasserstein_distance_to_uniform(x))
+avg_wasserstein_items = item_similarity_results.mean()
+std_wasserstein_items = item_similarity_results.std()
 
 # Concat results and obtain average and std of both ks_stat and p_value
-results = pd.concat([user_similarity_results, item_similarity_results])
-avg_ks_stat = results.apply(lambda x: x[0]).mean()
-avg_p_value = results.apply(lambda x: x[1]).mean()
+all_similarity_results = pd.concat([user_similarity_results, item_similarity_results])
+avg_wasserstein_all = all_similarity_results.mean()
+std_wasserstein_all = all_similarity_results.std()
 
-std_ks_stat = results.apply(lambda x: x[0]).std()
-std_p_value = results.apply(lambda x: x[1]).std()
-
-print(f"Average +- std K-S Statistic: {avg_ks_stat:.6f} +- {std_ks_stat:.6f}")
-print(f"Average +- std p-value: {avg_p_value:.6f} +- {std_p_value:.6f}")
+print(f"Wasserstein (users): {avg_wasserstein_users:.4f} +- {std_wasserstein_users:.4f}")
+print(f"Wasserstein (items): {avg_wasserstein_items:.4f} +- {std_wasserstein_items:.4f}")
+print(f"Wasserstein (all)  : {avg_wasserstein_all:.4f} +- {std_wasserstein_all:.4f}")
