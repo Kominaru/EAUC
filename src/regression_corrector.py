@@ -9,11 +9,21 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 import torch
 
-MODEL_NAME = "MF"
-REGRESSION_MODE: Literal["linear", "poly2", "spline", "linear_bins", "linear_sigmoid"] = "linear"
+MODEL_NAME = "BAYESIAN_SVD++"
+REGRESSION_MODE: Literal[
+    "linear",
+    "poly2",
+    "spline",
+    "linear_bins",
+    "linear_sigmoid",
+    "linear_sigmoid_bins",
+    "random_forest",
+    "linear_balanced",
+] = "linear_sigmoid"
 DATA_PARTITION = "test_probe"  # "train" or "test_probe"
-DATASET_NAME = "ml-10m"
+DATASET_NAME = "ml-1m"
 EXECUTION = 1
+BALANCED = True
 
 
 os.makedirs(f"outputs/{DATASET_NAME}/{MODEL_NAME}_correction_{REGRESSION_MODE}", exist_ok=True)
@@ -59,7 +69,20 @@ def create_test_probe(train_samples, test_samples):
     test_samples = test_samples.drop(test_probe.index)
     train_probe = train_samples.sample(n=len(test_probe), random_state=0)
     test_probe = pd.concat([test_probe, train_probe])
-    return test_samples, test_probe
+    train_samples = train_samples.drop(train_probe.index)
+    return train_samples, test_probe, test_samples
+
+
+# Balances the ratings in each ui_bin of the probe set
+def balance_probe(probe):
+    def balance_bin(bin):
+        min_rating_count = bin["rating"].value_counts().min()
+        bin = bin.groupby("rating").apply(lambda x: x.sample(min(len(x), max(min_rating_count, 1)), random_state=0))
+        return bin
+
+    probe = probe.groupby("ui_bin").apply(balance_bin).reset_index(drop=True)
+
+    return probe
 
 
 #############################
@@ -69,7 +92,7 @@ def create_test_probe(train_samples, test_samples):
 if REGRESSION_MODE == "linear":
     lr = LinearRegression()
 
-    test_samples, test_probe = create_test_probe(train_samples, test_samples)
+    train_samples, test_probe, test_samples = create_test_probe(train_samples, test_samples)
     print(f"Probe size: {len(test_probe)}")
 
     # Fit the linear regression on the probe set
@@ -104,10 +127,41 @@ if REGRESSION_MODE == "linear":
                 - lr.coef_[2] * sample["item_avg_rating"].values
             )
             / lr.coef_[0],
-            1,
-            5,
+            train_samples["rating"].min(),
+            train_samples["rating"].max(),
         )
 
+        return corrected_pred
+
+elif REGRESSION_MODE == "linear_balanced":
+    lr = LinearRegression()
+
+    train_samples["user_bin"] = (2 * train_samples["user_avg_rating"]).apply(int)
+    train_samples["item_bin"] = (2 * train_samples["item_avg_rating"]).apply(int)
+    train_samples["ui_bin"] = (train_samples["user_bin"] - 1) * 10 + train_samples["item_bin"] - 10
+
+    print("Max bin:", train_samples["ui_bin"].max())
+    print("Min bin:", train_samples["ui_bin"].min())
+
+    test_samples["user_bin"] = (2 * test_samples["user_avg_rating"]).apply(int)
+    test_samples["item_bin"] = (2 * test_samples["item_avg_rating"]).apply(int)
+    test_samples["ui_bin"] = (train_samples["user_bin"] - 1) * 10 + train_samples["item_bin"] - 10
+
+    train_samples, test_probe, test_samples = create_test_probe(train_samples, test_samples)
+
+    print(f"Probe size: {len(test_probe)}")
+
+    test_probe = balance_probe(test_probe)
+
+    # Fit the linear regression on the probe set
+    lr.fit(test_probe[["pred", "user_avg_rating", "item_avg_rating"]], test_probe["rating"])
+
+    def correct_predictions(sample):
+        corrected_pred = np.clip(
+            (lr.predict(sample[["pred", "user_avg_rating", "item_avg_rating"]].values)),
+            train_samples["rating"].min(),
+            train_samples["rating"].max(),
+        )
         return corrected_pred
 
 
@@ -129,7 +183,7 @@ elif REGRESSION_MODE == "spline":
 
     KNOTS = 20
 
-    test_samples, test_probe = create_test_probe(train_samples, test_samples)
+    train_samples, test_probe, test_samples = create_test_probe(train_samples, test_samples)
 
     splines = []
 
@@ -156,7 +210,9 @@ elif REGRESSION_MODE == "spline":
             if splines[i] is None:
                 continue
 
-            corrected_pred[samples["ui_bin"] == i] = np.clip(splines[i](x), 1, 5)
+            corrected_pred[samples["ui_bin"] == i] = np.clip(
+                splines[i](x), train_samples["rating"].min(), train_samples["rating"].max()
+            )
 
         return corrected_pred
 
@@ -181,7 +237,7 @@ elif REGRESSION_MODE == "poly2":
 
     DEGREE = 2
 
-    test_samples, test_probe = create_test_probe(train_samples, test_samples)
+    train_samples, test_probe, test_samples = create_test_probe(train_samples, test_samples)
 
     # For each bin, fit a polynomial regression model on the eest probe set
 
@@ -210,7 +266,11 @@ elif REGRESSION_MODE == "poly2":
         b = sol[samples["ui_bin"].values, 1]
         c = sol[samples["ui_bin"].values, 0]
 
-        corrected_pred = np.clip((-b + np.sqrt(b**2 - 4 * a * (c - samples["pred"].values))) / (2 * a), 1, 5)
+        corrected_pred = np.clip(
+            (-b + np.sqrt(b**2 - 4 * a * (c - samples["pred"].values))) / (2 * a),
+            train_samples["rating"].min(),
+            train_samples["rating"].max(),
+        )
 
         return corrected_pred
 
@@ -239,7 +299,12 @@ elif REGRESSION_MODE == "linear_bins":
 
     lr = LinearRegression(fit_intercept=False)
 
-    test_samples, test_probe = create_test_probe(train_samples, test_samples)
+    train_samples, test_probe, test_samples = create_test_probe(train_samples, test_samples)
+
+    if BALANCED:
+        print(f"Probe size: {len(test_probe)}")
+        test_probe = balance_probe(test_probe)
+        print(f"Probe size: {len(test_probe)}")
 
     # Learn a linear regression model using all the bin_i and bin_i_r columns as features, and the pred column as target
     lr.fit(
@@ -257,8 +322,8 @@ elif REGRESSION_MODE == "linear_bins":
         corrected_pred = np.clip(
             (sample["pred"].values - sample[[f"bin_{i}" for i in range(10 * 10)]].values @ lr.coef_[: 10 * 10])
             / (sample[[f"bin_{i}" for i in range(10 * 10)]].values @ lr.coef_[10 * 10 :]),
-            1,
-            5,
+            train_samples["rating"].min(),
+            train_samples["rating"].max(),
         )
 
         return corrected_pred
@@ -276,11 +341,29 @@ elif REGRESSION_MODE == "linear_sigmoid":
         def __init__(self):
             super().__init__()
             self.linear = torch.nn.Linear(3, 1)
+            self.max_rating = train_samples["rating"].max()
+            self.min_rating = train_samples["rating"].min()
 
         def forward(self, x):
-            return torch.sigmoid(self.linear(x)) * 4 + 1
+            return torch.sigmoid(self.linear(x)) * (self.max_rating - self.min_rating) + self.min_rating
 
-    test_samples, test_probe = create_test_probe(train_samples, test_samples)
+    train_samples["user_bin"] = (2 * train_samples["user_avg_rating"]).apply(int)
+    train_samples["item_bin"] = (2 * train_samples["item_avg_rating"]).apply(int)
+    train_samples["ui_bin"] = train_samples["user_bin"] * 10 + train_samples["item_bin"] - 10
+
+    test_samples["user_bin"] = (2 * test_samples["user_avg_rating"]).apply(int)
+    test_samples["item_bin"] = (2 * test_samples["item_avg_rating"]).apply(int)
+    test_samples["ui_bin"] = test_samples["user_bin"] * 10 + test_samples["item_bin"] - 10
+
+    print("Max bin:", train_samples["ui_bin"].max())
+    print("Min bin:", train_samples["ui_bin"].min())
+
+    train_samples, test_probe, test_samples = create_test_probe(train_samples, test_samples)
+
+    print(f"Probe size: {len(test_probe)}")
+
+    if BALANCED:
+        test_probe = balance_probe(test_probe)
 
     print(f"Probe size: {len(test_probe)}")
 
@@ -310,7 +393,103 @@ elif REGRESSION_MODE == "linear_sigmoid":
     # Compute the corrected predictions for the train and test sets
     def correct_predictions(samples):
         inputs = torch.tensor(samples[["pred", "user_avg_rating", "item_avg_rating"]].values, dtype=torch.float)
-        corrected_pred = np.clip(model(inputs).detach().numpy().reshape(-1), 1, 5)
+        corrected_pred = np.clip(
+            model(inputs).detach().numpy().reshape(-1), train_samples["rating"].min(), train_samples["rating"].max()
+        )
+        return corrected_pred
+
+elif REGRESSION_MODE == "linear_sigmoid_bins":
+    # Create a nn.module that takes rating, user_avg_rating, item_avg_rating as input and outputs a corrected rating
+    # The model is a linear regression with a sigmoid activation function
+
+    train_samples["user_bin"] = (2 * train_samples["user_avg_rating"]).apply(int)
+    train_samples["item_bin"] = (2 * train_samples["item_avg_rating"]).apply(int)
+    train_samples["ui_bin"] = train_samples["user_bin"] * 10 + train_samples["item_bin"] - 10
+
+    test_samples["user_bin"] = (2 * test_samples["user_avg_rating"]).apply(int)
+    test_samples["item_bin"] = (2 * test_samples["item_avg_rating"]).apply(int)
+    test_samples["ui_bin"] = test_samples["user_bin"] * 10 + test_samples["item_bin"] - 10
+
+    print("Max bin:", train_samples["ui_bin"].max())
+    print("Min bin:", train_samples["ui_bin"].min())
+
+    class LinearSigmoidRegression(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.weight_uibin_a = torch.nn.Embedding(10 * 10, 1)
+            self.weight_uibin_b = torch.nn.Embedding(10 * 10, 1)
+            self.max_rating = train_samples["rating"].max()
+            self.min_rating = train_samples["rating"].min()
+
+        def forward(self, x):
+            preds = self.weight_uibin_a(x[:, 0].long()) * x[:, 1].reshape(-1, 1) + self.weight_uibin_b(x[:, 0].long())
+            return torch.sigmoid(preds) * (self.max_rating - self.min_rating) + self.min_rating
+
+    train_samples, test_probe, test_samples = create_test_probe(train_samples, test_samples)
+
+    if BALANCED:
+        print(f"Probe size: {len(test_probe)}")
+        test_probe = balance_probe(test_probe)
+
+    print(f"Probe size: {len(test_probe)}")
+
+    # Fit the model on the probe set
+    model = LinearSigmoidRegression()
+    criterion = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    for epoch in range(30000):
+        optimizer.zero_grad()
+        inputs = torch.tensor(test_probe[["ui_bin", "pred"]].values, dtype=torch.float)
+        outputs = model(inputs)
+        target = torch.tensor(test_probe["rating"].values.reshape(-1, 1), dtype=torch.float)
+        loss = criterion(outputs, target)
+        loss.backward()
+        optimizer.step()
+        if epoch % 100 == 0:
+            print(f"Epoch {epoch} - Loss: {loss.item():.3f}")
+
+    # Compute the corrected predictions for the train and test sets
+    def correct_predictions(samples):
+        inputs = torch.tensor(samples[["ui_bin", "pred"]].values, dtype=torch.float)
+        corrected_pred = np.clip(
+            model(inputs).detach().numpy().reshape(-1), train_samples["rating"].min(), train_samples["rating"].max()
+        )
+        return corrected_pred
+
+elif REGRESSION_MODE == "random_forest":
+    train_samples["user_bin"] = (2 * train_samples["user_avg_rating"]).apply(int)
+    train_samples["item_bin"] = (2 * train_samples["item_avg_rating"]).apply(int)
+    train_samples["ui_bin"] = train_samples["user_bin"] * 10 + train_samples["item_bin"] - 10
+
+    test_samples["user_bin"] = (2 * test_samples["user_avg_rating"]).apply(int)
+    test_samples["item_bin"] = (2 * test_samples["item_avg_rating"]).apply(int)
+    test_samples["ui_bin"] = test_samples["user_bin"] * 10 + test_samples["item_bin"] - 10
+
+    print("Max bin:", train_samples["ui_bin"].max())
+    print("Min bin:", train_samples["ui_bin"].min())
+
+    train_samples, test_probe, test_samples = create_test_probe(train_samples, test_samples)
+
+    if BALANCED:
+        print(f"Probe size: {len(test_probe)}")
+        test_probe = balance_probe(test_probe)
+
+    print(f"Probe size: {len(test_probe)}")
+
+    from sklearn.ensemble import RandomForestRegressor
+
+    model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=0)
+
+    model.fit(test_probe[["user_avg_rating", "item_avg_rating", "pred"]], test_probe["rating"])
+
+    def correct_predictions(samples):
+        corrected_pred = np.clip(
+            model.predict(samples[["user_avg_rating", "item_avg_rating", "pred"]].values),
+            train_samples["rating"].min(),
+            train_samples["rating"].max(),
+        )
+
         return corrected_pred
 
 
@@ -320,8 +499,6 @@ test_samples["pred"] = correct_predictions(test_samples)
 
 train_samples = train_samples[["user_id", "item_id", "rating", "pred"]]
 test_samples = test_samples[["user_id", "item_id", "rating", "pred"]]
-
-os.makedirs(f"outputs/{MODEL_NAME}_correction_{REGRESSION_MODE}", exist_ok=True)
 
 print("Saving corrected predictions...")
 

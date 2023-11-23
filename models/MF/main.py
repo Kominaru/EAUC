@@ -12,8 +12,8 @@ from save_model_outputs import save_model_outputs
 
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
-    dataset_name="netflix-prize",
-    embedding_dim=128,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
+    dataset_name="ml-10m",
+    embedding_dim=512,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
     data_dir="data",
     max_epochs=1000,
     batch_size=2**15,
@@ -39,6 +39,7 @@ def train_MF(
         l2_reg=l2_reg,
         lr=learning_rate,
         dropout=dropout,
+        rating_range=(data_module.min_rating, data_module.max_rating),
     )
 
     # Initialize early stopping callback

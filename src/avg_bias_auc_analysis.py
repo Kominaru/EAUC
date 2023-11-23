@@ -23,6 +23,11 @@ COLORS = {
     "BAYESIAN_SVD++": "violet",
     "BAYESIAN_SVD++_correction_lr": "burlywood",
     "MF_correction_linear_sigmoid": "orange",
+    "MF_correction_linear_bins": "yellow",
+    "MF_correction_linear_sigmoid_bins": "brown",
+    "MF_correction_random_forest": "aquamarine",
+    "MF_correction_linear_balanced": "pink",
+    "BAYESIAN_SVD++_correction_linear_sigmoid": "burlywood",
 }
 
 CLEAN_NAMES = {
@@ -34,6 +39,11 @@ CLEAN_NAMES = {
     "GCMC": "GC-MC",
     "BAYESIAN_SVD++": "Bayesian SVD++",
     "MF_correction_linear_sigmoid": "MF + Linear + Sigmoid correction",
+    "MF_correction_linear_bins": "MF + Linear correction (bins)",
+    "MF_correction_linear_sigmoid_bins": "MF + Linear + Sigmoid correction (bins)",
+    "MF_correction_random_forest": "MF + Random Forest correction",
+    "MF_correction_linear_balanced": "MF + Linear correction (balanced data)",
+    "BAYESIAN_SVD++_correction_linear_sigmoid": "Bayesian SVD++ + Linear + Sigmoid correction",
 }
 
 
@@ -226,11 +236,11 @@ def plot_ratings_vs_preds_lineplot(
     plt.xlabel("Rating $r_{ui}$")
     plt.ylabel("Prediction $\hat{r}_{ui}$")
 
-    # plt.xlim(train_samples["rating"].min(), train_samples["rating"].max())
-    # plt.ylim(train_samples["rating"].min(), train_samples["rating"].max())
+    plt.xlim(train_samples["rating"].min(), train_samples["rating"].max())
+    plt.ylim(train_samples["rating"].min(), train_samples["rating"].max())
 
-    plt.xlim(1, 5)
-    plt.ylim(1, 5)
+    # plt.xlim(1, 5)
+    # plt.ylim(1, 5)
 
     if dmr_range is not None:
         plt.title(
@@ -283,7 +293,7 @@ if __name__ == "__main__":
             model_predictions[model] = {"train": train_predictions, "test": test_predictions}
 
     plot_ratings_vs_preds_lineplot(
-        model_predictions[models[0]]["train"][0], model_predictions[models[0]]["test"][0], dmr_range=None
+        model_predictions[models[0]]["train"][0], model_predictions[models[0]]["test"][0], dmr_range=(4, 4.5)
     )
 
     plt.figure(figsize=(5, 5))
@@ -305,7 +315,13 @@ if __name__ == "__main__":
             color=COLORS[model],
         )
 
-    plt.hist(model_predictions[model]["test"][0]["rating"], bins=100, alpha=0.5, label="Ratings", color="black")
+    plt.hist(
+        model_predictions[model]["test"][0]["rating"],
+        bins=[0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5],
+        alpha=0.5,
+        label="Ratings",
+        color="black",
+    )
 
     plt.xlabel("Prediction $\hat{r}_{ui}$")
     plt.ylabel("Frequency")
@@ -319,10 +335,10 @@ if __name__ == "__main__":
         # Take the first test sample of each model and plot the distribution of errors
         plt.hist(
             (model_predictions[model]["test"][0]["rating"] - model_predictions[model]["test"][0]["pred"]).abs(),
-            bins=100,
             alpha=0.5,
             label=CLEAN_NAMES[model],
             color=COLORS[model],
+            bins=100,
         )
 
     plt.xlabel("Prediction Absolute Error $|r_{ui} - \hat{r}_{ui}|$")

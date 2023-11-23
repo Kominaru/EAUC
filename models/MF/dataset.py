@@ -223,9 +223,15 @@ class DyadicRegressionDataModule(LightningDataModule):
         self.num_items = self.data["item_id"].max() + 1
         self.mean_rating = self.data["rating"].mean()
 
+        # Calculate the min and max ratings
+        self.min_rating = self.data["rating"].min()
+        self.max_rating = self.data["rating"].max()
+
         print(f"#Users: {self.num_users}")
         print(f"#Items: {self.num_items}")
         print(f"Mean rating: {self.mean_rating:.3f}")
+        print(f"Min rating: {self.min_rating:.3f}")
+        print(f"Max rating: {self.max_rating:.3f}")
 
         # Reset index and create PyTorch datasets
 

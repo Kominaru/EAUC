@@ -21,6 +21,7 @@ class CollaborativeFilteringModel(LightningModule):
         lr: float = 5e-4,
         l2_reg: float = 1e-5,
         dropout: float = 0.0,
+        rating_range: tuple = (1.0, 5.0),
     ):
         """
         Initializes a Collaborative Filtering model for item ratings prediction
@@ -58,7 +59,7 @@ class CollaborativeFilteringModel(LightningModule):
 
         self.rmse = torchmetrics.MeanSquaredError(squared=False)
 
-        self.clamp_ratings = lambda x: torch.clamp(x, min=1.0, max=5.0)
+        self.clamp_ratings = lambda x: torch.clamp(x, min=rating_range[0], max=rating_range[1])
 
         # Save hyperparameters
         self.save_hyperparameters()

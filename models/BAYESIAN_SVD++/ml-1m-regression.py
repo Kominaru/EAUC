@@ -263,8 +263,13 @@ if __name__ == "__main__":
     if ALGORITHM == "regression":
         y_pred = fm.predict(X_date_test, test_blocks, n_workers=8)
     else:
-        y_pred = fm.predict_proba(X_date_test, test_blocks, n_workers=8)
-        y_pred = y_pred.dot(np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
+        y_pred_probs = fm.predict_proba(X_date_test, test_blocks, n_workers=8)
+        # Ratings are 1, 2, 3, 4, 5
+        # We need to select the output class with probabilities equal to those probabilities
+        y_pred = np.zeros(np.shape(y_pred_probs)[0], dtype=np.int32)
+        for i in range(np.shape(y_pred_probs)[0]):
+            y_pred[i] = np.random.choice(np.arange(1, 6), p=y_pred_probs[i])
+
         df_test["rating"] += 1
 
     df_test["pred"] = y_pred
@@ -276,8 +281,11 @@ if __name__ == "__main__":
         df_train["pred"] = fm.predict(X_date_train, train_blocks, n_workers=8)
     else:
         preds = fm.predict_proba(X_date_train, train_blocks, n_workers=8)
-        preds = preds.dot(np.array([1.0, 2.0, 3.0, 4.0, 5.0]))
-        df_train["pred"] = preds
+        y_pred = np.zeros(np.shape(preds)[0], dtype=np.int32)
+        for i in range(np.shape(preds)[0]):
+            y_pred[i] = np.random.choice(np.arange(1, 6), p=preds[i])
+
+        df_train["pred"] = y_pred
         df_train["rating"] += 1
 
     # Change the movie_id column to item_id
