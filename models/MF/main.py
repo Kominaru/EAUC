@@ -1,18 +1,27 @@
 import os
+#Disable pytorch lightning warnings
+
 import random
 import pandas as pd
+import logging
+logging.getLogger('lightning').setLevel(0)
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
 import torch
 from dataset import DyadicRegressionDataModule
-from model import CollaborativeFilteringModel
+from model import CollaborativeFilteringModel, CrossAttentionMFModel
 from os import path
 from save_model_outputs import save_model_outputs
 
 
+
+
+MODEL="CrossAttMF"
+
+
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
-    dataset_name="ml-10m",
+    dataset_name="ml-1m",
     embedding_dim=512,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
     data_dir="data",
     max_epochs=1000,
@@ -21,6 +30,7 @@ def train_MF(
     l2_reg=1e-5,  # 1e-4 for tripadvisor-london and ml-100k
     learning_rate=1e-3,  # 5e-4 for ml-100k
     dropout=0.0,
+    verbose = 0
 ):
     """
     Trains a collaborative filtering model for regression over a dyadic dataset.
@@ -28,19 +38,33 @@ def train_MF(
 
     # Load the dyadic dataset using the data module
     data_module = DyadicRegressionDataModule(
-        data_dir, batch_size=batch_size, num_workers=num_workers, test_size=0.1, dataset_name=dataset_name
+        data_dir, batch_size=batch_size, num_workers=num_workers, test_size=0.1, dataset_name=dataset_name, verbose=verbose
     )
 
+
     # Initialize the collaborative filtering model
-    model = CollaborativeFilteringModel(
-        data_module.num_users,
-        data_module.num_items,
-        embedding_dim=embedding_dim,
-        l2_reg=l2_reg,
-        lr=learning_rate,
-        dropout=dropout,
-        rating_range=(data_module.min_rating, data_module.max_rating),
-    )
+    if MODEL == "MF":
+        model = CollaborativeFilteringModel(
+            data_module.num_users,
+            data_module.num_items,
+            embedding_dim=embedding_dim,
+            l2_reg=l2_reg,
+            lr=learning_rate,
+            dropout=dropout,
+            rating_range=(data_module.min_rating, data_module.max_rating),
+        )
+    elif MODEL == "CrossAttMF":
+        model = CrossAttentionMFModel(
+            data_module.num_users,
+            data_module.num_items,
+            usr_avg=data_module.avg_user_rating,
+            item_avg=data_module.avg_item_rating,
+            embedding_dim=embedding_dim,
+            l2_reg=l2_reg,
+            lr=learning_rate,
+            dropout=dropout,
+            rating_range=(data_module.min_rating, data_module.max_rating),
+        )
 
     # Initialize early stopping callback
     # Stops when the validation loss doesn't improve by 1e-4 for 10 epochs
@@ -63,6 +87,8 @@ def train_MF(
         max_epochs=max_epochs,
         accelerator="auto",
         callbacks=[early_stop_callback, checkpoint_callback],
+        enable_model_summary= verbose,
+        enable_progress_bar= verbose,
     )
 
     # Train the model
@@ -146,35 +172,29 @@ def train_MF(
 
 
 if __name__ == "__main__":
-    MODE = "train"
+    MODE = "tune"
 
     if MODE == "train":
-        train_MF()
+        train_MF(verbose = 1)
 
     elif MODE == "tune":
-        embedding_dims = [8, 32, 128, 512, 1024]
-        l2_regs = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-        learning_rates = [1e-3, 5e-4]
-        dropouts = [0.0, 0.2, 0.4, 0.6, 0.8]
+        
+        # Bayesian optimization
+        from bayes_opt import BayesianOptimization
 
-        # Choose n random hyperparameter combinations
-        NUM_TRIALS = 250
+        # Bounded region of parameter space
+        pbounds = {
+            "embedding_dim": (8, 1024),
+            "l2_reg": (1e-6, 1e-2),
+            "learning_rate": (1e-5, 1e-2),
+        }
 
-        # Create a dataframe to store the results
-        results_df = []
+        optimizer = BayesianOptimization(
+            f=train_MF,
+            pbounds=pbounds,
+        )
 
-        for i in range(NUM_TRIALS):
-            embedding_dim = random.choice(embedding_dims)
-            l2_reg = random.choice(l2_regs)
-            learning_rate = random.choice(learning_rates)
-            dropout = random.choice(dropouts)
+        optimizer.maximize(init_points=10, n_iter=10)
 
-            rmse = train_MF(embedding_dim=embedding_dim, l2_reg=l2_reg, learning_rate=learning_rate, dropout=dropout)
+        print(optimizer.max)
 
-            print("==============================================")
-            print(f"Trial {i+1}/{NUM_TRIALS} completed")
-            print(
-                f"Hyperparameters: embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}, dropout={dropout}"
-            )
-            print(f"RMSE: {rmse:.3f}")
-            print("==============================================")

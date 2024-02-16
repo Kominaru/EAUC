@@ -175,7 +175,7 @@ class DyadicRegressionDataset(Dataset):
 
 
 class DyadicRegressionDataModule(LightningDataModule):
-    def __init__(self, data_dir, batch_size=64, num_workers=0, test_size=0.1, dataset_name="ml-1m"):
+    def __init__(self, data_dir, batch_size=64, num_workers=0, test_size=0.1, dataset_name="ml-1m", verbose=True):
         """
         Creates a dyadic regression datamodule with a holdout train-test split.
         Downloads the dataset if it doesn't exist in the data directory.
@@ -210,13 +210,14 @@ class DyadicRegressionDataModule(LightningDataModule):
             self.train_df = self.data[msk]
             self.test_df = self.data[~msk]
 
-        print(f"#Training samples: {len(self.train_df)}")
-        print(f"#Test samples    : {len(self.test_df)}")
+        if verbose: 
+            print(f"#Training samples: {len(self.train_df)}")
+            print(f"#Test samples    : {len(self.test_df)}")
 
-        train_tuples = self.train_df[["user_id", "item_id"]].apply(tuple, axis=1)
-        test_tuples = self.test_df[["user_id", "item_id"]].apply(tuple, axis=1)
+            train_tuples = self.train_df[["user_id", "item_id"]].apply(tuple, axis=1)
+            test_tuples = self.test_df[["user_id", "item_id"]].apply(tuple, axis=1)
 
-        print("#Repeated samples: ", test_tuples.isin(train_tuples).sum())
+            print("#Repeated samples: ", test_tuples.isin(train_tuples).sum())
 
         # Calculate the number of users and items in the dataset
         self.num_users = self.data["user_id"].max() + 1
@@ -227,11 +228,26 @@ class DyadicRegressionDataModule(LightningDataModule):
         self.min_rating = self.data["rating"].min()
         self.max_rating = self.data["rating"].max()
 
-        print(f"#Users: {self.num_users}")
-        print(f"#Items: {self.num_items}")
-        print(f"Mean rating: {self.mean_rating:.3f}")
-        print(f"Min rating: {self.min_rating:.3f}")
-        print(f"Max rating: {self.max_rating:.3f}")
+
+        if verbose: 
+            print(f"#Users: {self.num_users} (max id {self.data['user_id'].max()})")
+            print(f"#Items: {self.num_items} (max id {self.data['item_id'].max()})")
+            print(f"Mean rating: {self.mean_rating:.3f}")
+            print(f"Min rating: {self.min_rating:.3f}")
+            print(f"Max rating: {self.max_rating:.3f}")
+
+        # Create array of size num_users to insert the average rating of each user
+        self.avg_user_rating = np.zeros(self.num_users)
+        
+        for i in np.unique(self.train_df["user_id"]):
+            self.avg_user_rating[i] = self.train_df[self.train_df["user_id"] == i]["rating"].mean()
+        
+        # Create array of size num_items to insert the average rating of each item
+        self.avg_item_rating = np.zeros(self.num_items)
+
+        for i in np.unique(self.train_df["item_id"]):
+            self.avg_item_rating[i] = self.train_df[self.train_df["item_id"] == i]["rating"].mean()
+
 
         # Reset index and create PyTorch datasets
 
