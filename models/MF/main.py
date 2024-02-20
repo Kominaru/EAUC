@@ -32,6 +32,7 @@ def train_MF(
     dropout=0.0,
     verbose=0,
     tune=False,
+    save_outputs=True,
 ):
     """
     Trains a collaborative filtering model for regression over a dyadic dataset .
@@ -153,13 +154,14 @@ def train_MF(
     test_samples_df = pd.concat(test_samples_data, ignore_index=True)
 
     # Save the train and test samples with predictions
-    save_model_outputs(
-        train_samples_df,
-        test_samples_df,
-        "MF",
-        dataset_name,
-        {"embedding_dim": embedding_dim, "l2_reg": l2_reg, "learning_rate": learning_rate, "dropout": dropout},
-    )
+    if save_outputs:
+        save_model_outputs(
+            train_samples_df,
+            test_samples_df,
+            "MF",
+            dataset_name,
+            {"embedding_dim": embedding_dim, "l2_reg": l2_reg, "learning_rate": learning_rate, "dropout": dropout},
+        )
 
     # RMSE
     rmse = ((train_samples_df["rating"] - train_samples_df["pred"]) ** 2).mean() ** 0.5
@@ -194,15 +196,14 @@ if __name__ == "__main__":
 
         # Bounded region of parameter space
         pbounds = {
-            "embedding_dim": (3, 10),
-            "l2_reg": (-6, -2),
-            "learning_rate": (-5, -2),
-            "dropout": (0, 0.5),
+            "embedding_dim": (3, 10), # 8 to 1024
+            "l2_reg": (-6, -2), # 1e-6 to 1e-2
+            "learning_rate": (-5, -2), # 1e-5 to 1e-2
         }
 
-        def train_MF_tune(embedding_dim, l2_reg, learning_rate, dropout):
+        def train_MF_tune(embedding_dim, l2_reg, learning_rate):
             return train_MF(
-                embedding_dim=embedding_dim, l2_reg=l2_reg, learning_rate=learning_rate, dropout=dropout, tune=True
+                embedding_dim=embedding_dim, l2_reg=l2_reg, learning_rate=learning_rate, tune=True, save_outputs=False
             )
 
         optimizer = BayesianOptimization(

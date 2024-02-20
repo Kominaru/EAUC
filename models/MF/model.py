@@ -179,6 +179,9 @@ class CrossAttentionMFModel(LightningModule):
 
         self.min_rating, self.max_rating = rating_range
 
+        self.eps = 1e-6
+        self.temp = 2/3
+
         # Initialize embedding weights with Xavier distribution
         nn.init.xavier_uniform_(self.user_embedding.weight)
         nn.init.xavier_uniform_(self.item_embedding.weight)
@@ -190,6 +193,9 @@ class CrossAttentionMFModel(LightningModule):
         self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
 
+        self.binary_concrete_inner = lambda x, u: (torch.log(u) - torch.log(1 - u) + x) / self.temp
+        self.binary_concrete_noise = lambda x: self.binary_concrete_inner(x, torch.clamp(torch.rand_like(x), self.eps, 1 - self.eps))
+
         # Save hyperparameters
         self.save_hyperparameters()
 
@@ -200,16 +206,18 @@ class CrossAttentionMFModel(LightningModule):
         user_avgs = self.user_avg[user_ids].unsqueeze(1)  # User average rating (d x 1)
         item_avgs = self.item_avg[item_ids].unsqueeze(1)  # Item average rating (d x 1)
 
-        user_atts = torch.softmax(self.user_att(user_avgs), dim=-1)  # User attention mask (d x 1)
-        item_atts = torch.softmax(self.item_att(item_avgs), dim=-1)  # Item attention mask (d x 1)
+        user_atts = torch.softmax(self.binary_concrete_noise(self.user_att(user_avgs)), dim=-1)  # User attention mask (d x 1)
+        item_atts = torch.softmax(self.binary_concrete_noise(self.item_att(item_avgs)), dim=-1)  # Item attention mask (d x 1)
 
         # Concat the crossed mask*embeddings products
         concat_cross = torch.cat([user_embeds * item_atts, item_embeds * user_atts], dim=-1)
 
-        preds = self.dropout(self.relu(concat_cross))
-        preds = self.dropout(self.relu(self.fc1(preds)))
-        preds = self.dropout(self.relu(self.fc2(preds)))
-        preds = self.fc3(preds)
+        preds = self.fc3(self.relu(self.fc2(self.relu(self.fc1(self.relu(concat_cross))))))
+
+        # preds = self.dropout(self.relu(concat_cross))
+        # preds = self.dropout(self.relu(self.fc1(preds)))
+        # preds = self.dropout(self.relu(self.fc2(preds)))
+        # preds = self.fc3(preds)
 
         preds = torch.sigmoid(preds) * (self.max_rating - self.min_rating) + self.min_rating
 
