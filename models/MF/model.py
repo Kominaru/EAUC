@@ -122,6 +122,7 @@ class CollaborativeFilteringModel(LightningModule):
 
         return optimizer
 
+
 class CrossAttentionMFModel(LightningModule):
     """
     Model that predicts the rating of a item for a user using a cross-attention mechanism
@@ -166,20 +167,17 @@ class CrossAttentionMFModel(LightningModule):
         self.item_att = nn.Linear(1, embedding_dim)
         self.user_avg = torch.Tensor(usr_avg).to("cuda")
         self.item_avg = torch.Tensor(item_avg).to("cuda")
-        
-        self.fc1 = nn.Linear(embedding_dim*2, embedding_dim)
-        self.fc2 = nn.Linear(embedding_dim, embedding_dim//2)
-        self.fc3 = nn.Linear(embedding_dim//2, 1)
 
-        self.user_dropout = nn.Dropout(dropout)
-        self.item_dropout = nn.Dropout(dropout)
+        self.fc1 = nn.Linear(embedding_dim * 2, embedding_dim)
+        self.fc2 = nn.Linear(embedding_dim, embedding_dim // 2)
+        self.fc3 = nn.Linear(embedding_dim // 2, 1)
 
         self.lr = lr
         self.l2_reg = l2_reg
 
         self.loss_fn = nn.MSELoss()
 
-        self.min_rating , self.max_rating = rating_range
+        self.min_rating, self.max_rating = rating_range
 
         # Initialize embedding weights with Xavier distribution
         nn.init.xavier_uniform_(self.user_embedding.weight)
@@ -189,23 +187,31 @@ class CrossAttentionMFModel(LightningModule):
 
         self.clamp_ratings = lambda x: torch.clamp(x, min=rating_range[0], max=rating_range[1])
 
+        self.dropout = nn.Dropout(dropout)
+        self.relu = nn.ReLU()
+
         # Save hyperparameters
         self.save_hyperparameters()
 
     def forward(self, user_ids, item_ids):
-        user_embeds = self.user_embedding(user_ids) # User embed (d x 1)
-        item_embeds = self.item_embedding(item_ids) # Item embed (d x 1)
+        user_embeds = self.user_embedding(user_ids)  # User embed (d x 1)
+        item_embeds = self.item_embedding(item_ids)  # Item embed (d x 1)
 
-        user_avgs = self.user_avg[user_ids].unsqueeze(1) # User average rating (d x 1)
-        item_avgs = self.item_avg[item_ids].unsqueeze(1) # Item average rating (d x 1)
+        user_avgs = self.user_avg[user_ids].unsqueeze(1)  # User average rating (d x 1)
+        item_avgs = self.item_avg[item_ids].unsqueeze(1)  # Item average rating (d x 1)
 
-        user_atts = torch.softmax(self.user_att(user_avgs), dim=-1) # User attention mask (d x 1)
-        item_atts = torch.softmax(self.item_att(item_avgs), dim=-1) # Item attention mask (d x 1)
+        user_atts = torch.softmax(self.user_att(user_avgs), dim=-1)  # User attention mask (d x 1)
+        item_atts = torch.softmax(self.item_att(item_avgs), dim=-1)  # Item attention mask (d x 1)
 
         # Concat the crossed mask*embeddings products
-        concat_cross = torch.cat([user_embeds * item_atts, item_embeds* user_atts], dim=-1)
+        concat_cross = torch.cat([user_embeds * item_atts, item_embeds * user_atts], dim=-1)
 
-        preds = torch.sigmoid(self.fc3(self.fc2(self.fc1(concat_cross))))*(self.max_rating-self.min_rating)+self.min_rating
+        preds = self.dropout(self.relu(concat_cross))
+        preds = self.dropout(self.relu(self.fc1(preds)))
+        preds = self.dropout(self.relu(self.fc2(preds)))
+        preds = self.fc3(preds)
+
+        preds = torch.sigmoid(preds) * (self.max_rating - self.min_rating) + self.min_rating
 
         return preds
 

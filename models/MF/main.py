@@ -1,10 +1,12 @@
 import os
-#Disable pytorch lightning warnings
+
+# Disable pytorch lightning warnings
 
 import random
 import pandas as pd
 import logging
-logging.getLogger('lightning').setLevel(0)
+
+logging.getLogger("lightning").setLevel(0)
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import EarlyStopping
 import torch
@@ -14,33 +16,41 @@ from os import path
 from save_model_outputs import save_model_outputs
 
 
-
-
-MODEL="CrossAttMF"
+MODEL = "CrossAttMF"
 
 
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
     dataset_name="ml-1m",
-    embedding_dim=512,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
+    embedding_dim=256,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
     data_dir="data",
     max_epochs=1000,
     batch_size=2**15,
     num_workers=4,
-    l2_reg=1e-5,  # 1e-4 for tripadvisor-london and ml-100k
-    learning_rate=1e-3,  # 5e-4 for ml-100k
+    l2_reg=1e-3,  # 1e-4 for tripadvisor-london and ml-100k
+    learning_rate=1e-4,  # 5e-4 for ml-100k
     dropout=0.0,
-    verbose = 0
+    verbose=0,
+    tune=False,
 ):
     """
-    Trains a collaborative filtering model for regression over a dyadic dataset.
+    Trains a collaborative filtering model for regression over a dyadic dataset .
     """
+
+    if tune:
+        l2_reg = 10**l2_reg
+        learning_rate = 10**learning_rate
+        embedding_dim = int(2**embedding_dim)
 
     # Load the dyadic dataset using the data module
     data_module = DyadicRegressionDataModule(
-        data_dir, batch_size=batch_size, num_workers=num_workers, test_size=0.1, dataset_name=dataset_name, verbose=verbose
+        data_dir,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        test_size=0.1,
+        dataset_name=dataset_name,
+        verbose=verbose,
     )
-
 
     # Initialize the collaborative filtering model
     if MODEL == "MF":
@@ -87,8 +97,8 @@ def train_MF(
         max_epochs=max_epochs,
         accelerator="auto",
         callbacks=[early_stop_callback, checkpoint_callback],
-        enable_model_summary= verbose,
-        enable_progress_bar= verbose,
+        enable_model_summary=verbose,
+        enable_progress_bar=verbose,
     )
 
     # Train the model
@@ -168,33 +178,38 @@ def train_MF(
     #         f"embedding_dim={embedding_dim}, l2_reg={l2_reg}, learning_rate={learning_rate}, dropout={dropout} rmse={rmse}\n"
     #     )
 
-    return rmse
+    return -rmse
 
 
 if __name__ == "__main__":
     MODE = "tune"
 
     if MODE == "train":
-        train_MF(verbose = 1)
+        train_MF(verbose=1)
 
     elif MODE == "tune":
-        
+
         # Bayesian optimization
         from bayes_opt import BayesianOptimization
 
         # Bounded region of parameter space
         pbounds = {
-            "embedding_dim": (8, 1024),
-            "l2_reg": (1e-6, 1e-2),
-            "learning_rate": (1e-5, 1e-2),
+            "embedding_dim": (3, 10),
+            "l2_reg": (-6, -2),
+            "learning_rate": (-5, -2),
+            "dropout": (0, 0.5),
         }
 
+        def train_MF_tune(embedding_dim, l2_reg, learning_rate, dropout):
+            return train_MF(
+                embedding_dim=embedding_dim, l2_reg=l2_reg, learning_rate=learning_rate, dropout=dropout, tune=True
+            )
+
         optimizer = BayesianOptimization(
-            f=train_MF,
+            f=train_MF_tune,
             pbounds=pbounds,
         )
 
-        optimizer.maximize(init_points=10, n_iter=10)
+        optimizer.maximize(init_points=10, n_iter=30)
 
         print(optimizer.max)
-
