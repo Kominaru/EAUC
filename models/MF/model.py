@@ -163,8 +163,16 @@ class CrossAttentionMFModel(LightningModule):
 
         self.user_embedding = nn.Embedding(num_users, embedding_dim)
         self.item_embedding = nn.Embedding(num_items, embedding_dim)
-        self.user_att = nn.Linear(1, embedding_dim)
-        self.item_att = nn.Linear(1, embedding_dim)
+
+        # 1xd attention masks
+        # self.user_att = nn.Linear(1, embedding_dim)
+        # self.item_att = nn.Linear(1, embedding_dim)
+
+        #dxd attention masks
+        self.user_att = nn.Linear(1, embedding_dim*embedding_dim)
+        self.item_att = nn.Linear(1, embedding_dim*embedding_dim)
+
+
         self.user_avg = torch.Tensor(usr_avg).to("cuda")
         self.item_avg = torch.Tensor(item_avg).to("cuda")
 
@@ -206,13 +214,41 @@ class CrossAttentionMFModel(LightningModule):
         user_avgs = self.user_avg[user_ids].unsqueeze(1)  # User average rating (d x 1)
         item_avgs = self.item_avg[item_ids].unsqueeze(1)  # Item average rating (d x 1)
 
-        user_atts = torch.softmax(self.binary_concrete_noise(self.user_att(user_avgs)), dim=-1)  # User attention mask (d x 1)
-        item_atts = torch.softmax(self.binary_concrete_noise(self.item_att(item_avgs)), dim=-1)  # Item attention mask (d x 1)
+        # Using binary concrete noise to regularize the attention masks (d x 1)
+        # user_atts = torch.softmax(self.binary_concrete_noise(self.user_att(user_avgs)), dim=-1)  # User attention mask (d x 1)
+        # item_atts = torch.softmax(self.binary_concrete_noise(self.item_att(item_avgs)), dim=-1)  # Item attention mask (d x 1)
 
+        # Attention masks (d x d)
+        user_atts = self.user_att(user_avgs).reshape(-1, user_embeds.shape[1], user_embeds.shape[1])
+        item_atts = self.item_att(item_avgs).reshape(-1, item_embeds.shape[1], item_embeds.shape[1])
+
+        print("Attention mask: ", user_atts.shape)
+        
+        user_atts = torch.softmax(user_atts, dim=0)  # User attention mask (d x d)
+        item_atts = torch.softmax(item_atts, dim=0)  # Item attention mask (d x d)
+
+        # Cross attention
+
+        user_embeds = user_embeds.unsqueeze(1)
+        item_embeds = item_embeds.unsqueeze(1)
+
+        print("User embeds: ", user_embeds.shape)
+
+        user_embeds = torch.bmm(user_embeds, user_atts).squeeze(1)  # User cross attention (d x 1)
+        item_embeds = torch.bmm(item_embeds, item_atts).squeeze(1)
+
+        print("User embeds: ", user_embeds.shape)
+
+        input()
+
+        # Item cross attention (d x 1)
+
+        preds = torch.sum(user_embeds * item_embeds, dim=-1, keepdim=True)
+        
         # Concat the crossed mask*embeddings products
-        concat_cross = torch.cat([user_embeds * item_atts, item_embeds * user_atts], dim=-1)
+        # concat_cross = torch.cat([user_embeds * item_atts, item_embeds * user_atts], dim=-1)
 
-        preds = self.fc3(self.relu(self.fc2(self.relu(self.fc1(self.relu(concat_cross))))))
+        # preds = self.fc3(self.relu(self.fc2(self.relu(self.fc1(self.relu(concat_cross))))))
 
         # preds = self.dropout(self.relu(concat_cross))
         # preds = self.dropout(self.relu(self.fc1(preds)))

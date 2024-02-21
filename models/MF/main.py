@@ -22,7 +22,7 @@ MODEL = "CrossAttMF"
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
     dataset_name="ml-1m",
-    embedding_dim=256,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
+    embedding_dim=64,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
     data_dir="data",
     max_epochs=1000,
     batch_size=2**15,
@@ -184,7 +184,7 @@ def train_MF(
 
 
 if __name__ == "__main__":
-    MODE = "tune"
+    MODE = "train"
 
     if MODE == "train":
         train_MF(verbose=1)
