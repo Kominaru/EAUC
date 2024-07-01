@@ -228,8 +228,8 @@ class CrossAttentionMFModel(LightningModule):
 
         # print("Attention mask: ", user_atts.shape)
 
-        user_atts = torch.softmax(user_atts, dim=1)  # User attention mask (d x d)
-        item_atts = torch.softmax(item_atts, dim=1)  # Item attention mask (d x d)
+        user_atts = torch.softmax(user_atts, dim=2)  # User attention mask (d x d)
+        item_atts = torch.softmax(item_atts, dim=2)  # Item attention mask (d x d)
 
         # Cross attention
 
@@ -259,7 +259,7 @@ class CrossAttentionMFModel(LightningModule):
         # preds = self.dropout(self.relu(self.fc2(preds)))
         # preds = self.fc3(preds)
 
-        preds = torch.sigmoid(preds) * (self.max_rating - self.min_rating) + self.min_rating
+        # preds = torch.sigmoid(preds) * (self.max_rating - self.min_rating) + self.min_rating
 
         return preds.transpose(0, 1)
 

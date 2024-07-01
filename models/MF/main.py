@@ -22,13 +22,13 @@ MODEL = "CrossAttMF"
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
     dataset_name="ml-1m",
-    embedding_dim=16,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
+    embedding_dim=8,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
     data_dir="data",
     max_epochs=1000,
     batch_size=2**15,
     num_workers=4,
-    l2_reg=1e-4,  # 1e-4 for tripadvisor-london and ml-100k
-    learning_rate=1e-4,  # 5e-4 for ml-100k
+    l2_reg=1e-5,  # 1e-4 for tripadvisor-london and ml-100k
+    learning_rate=1e-3,  # 5e-4 for ml-100k
     dropout=0.0,
     verbose=0,
     tune=False,
@@ -79,7 +79,7 @@ def train_MF(
 
     # Initialize early stopping callback
     # Stops when the validation loss doesn't improve by 1e-4 for 10 epochs
-    early_stop_callback = EarlyStopping(monitor="val_loss", patience=10, mode="min", min_delta=1e-4)
+    early_stop_callback = EarlyStopping(monitor="val_loss", patience=20, mode="min", min_delta=1e-4)
 
     # Checkpoint only the weights that give the best validation RMSE, overwriting existing checkpoints
     if path.exists("models/MF/checkpoints/best-model.ckpt"):

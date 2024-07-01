@@ -177,3 +177,4 @@ models/MRMA/pmf/weights
 **/lightning_logs/
 log/
 callback_result_oprobit_fold_9.pkl
+models/MF/MF.zip
