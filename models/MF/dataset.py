@@ -134,6 +134,70 @@ def load_and_format_netflixprize_data(dataset_name):
     return df
 
 
+def load_and_format_gdsc1_data(dataset_name):
+    """
+    Formats a raw GDSC1 dataset into a the standard user/item format used in this project.
+    The datasets are available at https://www.cancerrxgene.org/gdsc1000/GDSC1000_WebResources/Home.html
+
+    Args:
+        dataset_name (str): Name of the dataset (gdsc1)
+
+    Returns:
+        pandas.DataFrame: DataFrame containing the formatted dataset with the columns ['user_id', 'item_id', 'rating']
+    """
+
+    # Load the data
+    df = pd.read_csv("data/gdsc1/gdsc1_raw.csv", sep=";")
+
+    # Rename the columns
+    df = df[["COSMIC_ID", "DRUG_ID", "LN_IC50"]]
+    df.columns = ["user_id", "item_id", "rating"]
+    df = df.dropna()
+
+    df["user_id"] = df["user_id"].astype("category").cat.codes
+    df["item_id"] = df["item_id"].astype("category").cat.codes
+
+    df = df.sample(frac=0.3, random_state=42).reset_index(drop=True)
+
+    return df
+
+
+def load_and_format_diabetes_data(dataset_name):
+    df = pd.read_csv("data/uci-diabetes/diabetes_processed.csv")
+
+    df = df.dropna()
+    df["user_id"] = df["user_id"].astype("category").cat.codes
+    df["item_id"] = df["item_id"].astype("category").cat.codes
+
+    return df
+
+
+def load_and_format_dot_data(dataset_name):
+
+    df = pd.read_csv("data/dot_2023/dot_2023_processed.csv")
+
+    df["rating"] = df["rating"].astype(np.float32)
+
+    return df
+
+
+def load_and_format_ctrpv2_data(dataset_name):
+    df = pd.read_csv("data/ctrpv2/ctrpv2_processed.csv")
+
+    df["user_id"] = df["user_id"].astype("category").cat.codes
+    df["item_id"] = df["item_id"].astype("category").cat.codes
+
+    return df
+
+
+def load_and_format_kiva_data(dataset_name):
+    df = pd.read_csv("data/kiva-ml-17/user_profiles.csv")
+
+    df["user_id"] = df["user_id"].astype("category").cat.codes
+
+    return df
+
+
 class DyadicRegressionDataset(Dataset):
     """
     Represents a dataset for regression over dyadic data.
@@ -201,6 +265,16 @@ class DyadicRegressionDataModule(LightningDataModule):
             self.data = load_and_format_netflixprize_data(dataset_name)
         elif dataset_name == "douban-monti":
             self.data, self.train_df, self.test_df = load_and_format_doubanmonti_data(dataset_name)
+        elif dataset_name == "gdsc1":
+            self.data = load_and_format_gdsc1_data(dataset_name)
+        elif dataset_name == "uci-diabetes":
+            self.data = load_and_format_diabetes_data(dataset_name)
+        elif dataset_name == "dot_2023":
+            self.data = load_and_format_dot_data(dataset_name)
+        elif dataset_name == "ctrpv2":
+            self.data = load_and_format_ctrpv2_data(dataset_name)
+        elif dataset_name == "kiva-ml-17":
+            self.data = load_and_format_kiva_data(dataset_name)
 
         if dataset_name != "douban-monti":
             # Split the df into train and test sets (pandas dataframe)
@@ -210,14 +284,14 @@ class DyadicRegressionDataModule(LightningDataModule):
             self.train_df = self.data[msk]
             self.test_df = self.data[~msk]
 
-        if verbose: 
+        if verbose:
             print(f"#Training samples: {len(self.train_df)}")
             print(f"#Test samples    : {len(self.test_df)}")
 
-            train_tuples = self.train_df[["user_id", "item_id"]].apply(tuple, axis=1)
-            test_tuples = self.test_df[["user_id", "item_id"]].apply(tuple, axis=1)
+            # train_tuples = self.train_df[["user_id", "item_id"]].apply(tuple, axis=1)
+            # test_tuples = self.test_df[["user_id", "item_id"]].apply(tuple, axis=1)
 
-            print("#Repeated samples: ", test_tuples.isin(train_tuples).sum())
+            # print("#Repeated samples: ", test_tuples.isin(train_tuples).sum())
 
         # Calculate the number of users and items in the dataset
         self.num_users = self.data["user_id"].max() + 1
@@ -228,26 +302,28 @@ class DyadicRegressionDataModule(LightningDataModule):
         self.min_rating = self.data["rating"].min()
         self.max_rating = self.data["rating"].max()
 
-
-        if verbose: 
-            print(f"#Users: {self.num_users} (max id {self.data['user_id'].max()})")
-            print(f"#Items: {self.num_items} (max id {self.data['item_id'].max()})")
+        if verbose:
+            print(f"Examples: {len(self.data)}")
+            print(f"#Users: {self.data['user_id'].nunique()} (max id {self.data['user_id'].max()})")
+            print(f"#Items: {self.data['item_id'].nunique()} (max id {self.data['item_id'].max()})")
+            print(
+                f"Density: {np.int64(len(self.data)) / (np.int64(self.data['user_id'].nunique()) * np.int64(self.data['item_id'].nunique())):.3f}"
+            )
             print(f"Mean rating: {self.mean_rating:.3f}")
             print(f"Min rating: {self.min_rating:.3f}")
             print(f"Max rating: {self.max_rating:.3f}")
 
         # Create array of size num_users to insert the average rating of each user
         self.avg_user_rating = np.zeros(self.num_users)
-        
+
         for i in np.unique(self.train_df["user_id"]):
             self.avg_user_rating[i] = self.train_df[self.train_df["user_id"] == i]["rating"].mean()
-        
+
         # Create array of size num_items to insert the average rating of each item
         self.avg_item_rating = np.zeros(self.num_items)
 
         for i in np.unique(self.train_df["item_id"]):
             self.avg_item_rating[i] = self.train_df[self.train_df["item_id"] == i]["rating"].mean()
-
 
         # Reset index and create PyTorch datasets
 

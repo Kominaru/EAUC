@@ -6,7 +6,7 @@ import h5py
 import os
 
 # Load dataset
-dataset_name = "netflix-prize"
+dataset_name = "ml-1m"
 
 if dataset_name == "ml-1m":
     df = pd.read_csv("data/ml-1m/ratings.dat", sep="::", engine="python")
@@ -50,8 +50,8 @@ elif dataset_name == "douban-monti":
         )
 
         # Min and max ratings
-        min_rating = df["rating"].min()
-        max_rating = df["rating"].max()
+        # min_rating = df["rating"].min()
+        # max_rating = df["rating"].max()
 
         return df
 
@@ -98,6 +98,23 @@ elif dataset_name == "netflix-prize":
 
 # Rename columns to user_id, item_id, rating, and remove timestamp
 
+elif dataset_name == "gdsc1":
+    df = pd.read_csv("data/gdsc1/gdsc1_processed.csv")
+    df[df["rating"] < -10] = -10
+    df[df["rating"] > 10] = 10
+
+elif dataset_name == "ctrpv2":
+    df = pd.read_csv("data/ctrpv2/ctrpv2_processed.csv")
+    df["rating"] = df["rating"].clip(lower=0, upper=20)
+
+elif dataset_name == "dot_2023":
+    df = pd.read_csv("data/dot_2023/dot_2023_processed.csv")
+    df["rating"] = df["rating"].clip(lower=0, upper=20)
+
+elif dataset_name == "kiva-ml-17":
+    df = pd.read_csv("data/kiva-ml-17/user_profiles.csv")
+    df["user_id"] = df["user_id"].astype("category").cat.codes
+
 a = df["rating"].min()
 b = df["rating"].max()
 
@@ -119,27 +136,27 @@ def wasserstein_distance_to_uniform(data_grouped):
 tqdm.tqdm.pandas()
 
 
-# # Kolmogorov-Smirnov test
+# Kolmogorov-Smirnov test
 
-# # Measure for each user
-# user_similarity_results = df.groupby("user_id")["rating"].progress_apply(lambda x: measure_similarity_to_uniform(x))
-# avg_ks_users = user_similarity_results.apply(lambda x: x[0]).mean()
-# std_ks_users = user_similarity_results.apply(lambda x: x[0]).std()
+# Measure for each user
+user_similarity_results = df.groupby("user_id")["rating"].progress_apply(lambda x: measure_similarity_to_uniform(x))
+avg_ks_users = user_similarity_results.apply(lambda x: x[0]).mean()
+std_ks_users = user_similarity_results.apply(lambda x: x[0]).std()
 
-# # Measure for each item
-# item_similarity_results = df.groupby("item_id")["rating"].progress_apply(lambda x: measure_similarity_to_uniform(x))
-# avg_ks_items = item_similarity_results.apply(lambda x: x[0]).mean()
-# std_ks_items = item_similarity_results.apply(lambda x: x[0]).std()
+# Measure for each item
+item_similarity_results = df.groupby("item_id")["rating"].progress_apply(lambda x: measure_similarity_to_uniform(x))
+avg_ks_items = item_similarity_results.apply(lambda x: x[0]).mean()
+std_ks_items = item_similarity_results.apply(lambda x: x[0]).std()
 
-# # Concat results and obtain average and std of both ks_stat and p_value
-# all_similarity_results = pd.concat([user_similarity_results, item_similarity_results])
-# avg_ks_all = all_similarity_results.apply(lambda x: x[0]).mean()
-# std_ks_all = all_similarity_results.apply(lambda x: x[0]).std()
+# Concat results and obtain average and std of both ks_stat and p_value
+all_similarity_results = pd.concat([user_similarity_results, item_similarity_results])
+avg_ks_all = all_similarity_results.apply(lambda x: x[0]).mean()
+std_ks_all = all_similarity_results.apply(lambda x: x[0]).std()
 
 
-# print(f"K-S (users): {avg_ks_users:.4f} +- {std_ks_users:.4f}")
-# print(f"K-S (items): {avg_ks_items:.4f} +- {std_ks_items:.4f}")
-# print(f"K-S (all)  : {avg_ks_all:.4f} +- {std_ks_all:.4f}")
+print(f"K-S (users): {avg_ks_users:.4f} +- {std_ks_users:.4f}")
+print(f"K-S (items): {avg_ks_items:.4f} +- {std_ks_items:.4f}")
+print(f"K-S (all)  : {avg_ks_all:.4f} +- {std_ks_all:.4f}")
 
 # Wasserstein distance
 

@@ -100,8 +100,72 @@ if __name__ == "__main__":
         raise ValueError("fold_index must be in the range(1, 6).")
     ALGORITHM = args.algorithm
 
-    df = pd.read_csv("data/ml-100k/u.data", sep="\t", header=None)
-    df.columns = ["user_id", "movie_id", "rating", "timestamp"]
+    # df = pd.read_csv("data/ml-100k/u.data", sep="\t", header=None)
+    # df.columns = ["user_id", "movie_id", "rating", "timestamp"]
+
+    def load_and_format_doubanmonti_data(dataset_name):
+        # Open douban-monti dataset (matlab file) using h5py
+        import h5py
+
+        with h5py.File(os.path.join("data", dataset_name, "training_test_dataset.mat"), "r") as f:
+            # Convert to numpy arrays
+
+            data = np.array(f["M"])
+            train_data = np.array(f["M"]) * np.array(f["Otraining"])
+            test_data = np.array(f["M"]) * np.array(f["Otest"])
+
+        def rating_matrix_to_dataframe(ratings: np.ndarray):
+            """
+            Converts a rating matrix to a pandas DataFrame.
+
+            Args:
+                ratings (np.ndarray): Rating matrix
+
+            Returns:
+                pandas.DataFrame: DataFrame containing the ratings
+            """
+
+            # Get the indices of the non-zero ratings
+            nonzero_indices = np.nonzero(ratings)
+
+            # Create the dataframe
+            df = pd.DataFrame(
+                {
+                    "user_id": nonzero_indices[0],
+                    "item_id": nonzero_indices[1],
+                    "rating": ratings[nonzero_indices],
+                }
+            )
+
+            # Min and max ratings
+            min_rating = df["rating"].min()
+            max_rating = df["rating"].max()
+
+            return df
+
+        # Convert the training and test data to dataframes
+        all_df = rating_matrix_to_dataframe(data)
+
+        return all_df
+
+    DATASET = "douban-monti"
+
+    if DATASET == "gdsc1":
+        df = pd.read_csv("data/gdsc1/gdsc1_processed.csv")
+        df = df.sample(frac=0.3).reset_index(drop=True)
+    elif DATASET == "dot_2023":
+        df = pd.read_csv("data/dot_2023/dot_2023_processed.csv")
+    elif DATASET == "CTRPv2":
+        df = pd.read_csv("data/CTRPv2/CTRPv2_processed.csv")
+    elif DATASET == "kiva-ml-17":
+        df = pd.read_csv("data/kiva-ml-17/user_profiles.csv")
+        df["user_id"] = df["user_id"].astype("category").cat.codes
+    elif DATASET == "douban-monti":
+        df = load_and_format_doubanmonti_data(DATASET)
+
+    df = df[["user_id", "item_id", "rating"]]
+    df.columns = ["user_id", "movie_id", "rating"]
+
     df_train = df.sample(frac=0.9)
     df_test = df.drop(df_train.index)
     # data_manager = MovieLens100kDataManager()
@@ -285,7 +349,7 @@ if __name__ == "__main__":
         train_df=df_train,
         test_df=df_test,
         model_name="BAYESIAN_SVD++",
-        dataset_name="ml-100k",
+        dataset_name=DATASET,
         model_params={
             "iteration": ITERATION,
             "dimension": DIMENSION,

@@ -100,9 +100,51 @@ if __name__ == "__main__":
     # data_manager = MovieLens1MDataManager()
     # df_train, df_test = data_manager.load_rating_kfold_split(10, FOLD_INDEX, random_seed)
 
-    df = pd.read_csv(
-        "data/ml-1m/ratings.dat", sep="::", header=None, names=["user_id", "movie_id", "rating", "timestamp"]
-    )
+    # df = pd.read_csv(
+    #     "data/ml-1m/ratings.dat", sep="::", header=None, names=["user_id", "movie_id", "rating", "timestamp"]
+    # )
+
+    DATASET = "tripadvisor-london"
+
+    def load_data_tripadvisor(path="./", frac=0.1, seed=1234):
+
+        df = pd.read_pickle(path + "reviews.pkl")
+
+        df = df[["userId", "restaurantId", "rating"]]
+        df.columns = ["user_id", "item_id", "rating"]
+
+        df = df.drop_duplicates(subset=["user_id", "item_id"], keep="first")
+
+        df["user_id"] = df["user_id"].astype("category").cat.codes
+        df["item_id"] = df["item_id"].astype("category").cat.codes
+
+        postsPerItem = df.groupby(["item_id"]).size()
+        df = df[np.in1d(df.item_id, postsPerItem[postsPerItem >= 10].index)]
+
+        postsPerUser = df.groupby(["user_id"]).size()
+        df = df[np.in1d(df.user_id, postsPerUser[postsPerUser >= 10].index)]
+
+        df = df.dropna()
+
+        df["user_id"] = df["user_id"].astype("category").cat.codes
+        df["item_id"] = df["item_id"].astype("category").cat.codes
+
+        df["rating"] = df["rating"] / 10
+
+        df.columns = ["user_id", "movie_id", "rating"]
+
+        return df
+
+    if DATASET == "tripadvisor-london":
+        df = load_data_tripadvisor(path="./data/tripadvisor-london/")
+    elif DATASET == "dot_2023":
+        df = pd.read_csv("data/dot_2023/dot_2023_processed.csv")
+        df.columns = ["user_id", "movie_id", "rating"]
+
+    elif DATASET == "kiva-ml-17":
+        df = pd.read_csv("data/kiva-ml-17/user_profiles.csv")
+        df["user_id"] = df["user_id"].astype("category").cat.codes
+        df.columns = ["user_id", "movie_id", "rating"]
     # Split 90% train, 10% test
     df_train = df.sample(frac=0.9)
     df_test = df.drop(df_train.index)
@@ -234,8 +276,8 @@ if __name__ == "__main__":
             X_date_test,
             df_test.rating.values,
             X_rel_test=test_blocks,
-            clip_min=0.5,
-            clip_max=5.0,
+            clip_min=df_train.rating.min(),
+            clip_max=df_train.rating.max(),
             trace_path=trace_path,
         )
     else:
@@ -296,7 +338,7 @@ if __name__ == "__main__":
         train_df=df_train,
         test_df=df_test,
         model_name="BAYESIAN_SVD++",
-        dataset_name="ml-1m",
+        dataset_name=DATASET,
         model_params={
             "iteration": ITERATION,
             "dimension": DIMENSION,

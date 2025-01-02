@@ -94,7 +94,7 @@ def compute_avg_bias_auc(
 
     # Compute the AVG-BIAS-AUC and normalize to [0, 1]
     avg_bias_auc = np.trapz(yy, xx) / (
-        (xx.max() - xx.min()) * (test_samples["rating"].max() - test_samples["rating"].min())
+        (test_samples["rating"].max() - test_samples["rating"].min()) ** 2
     )  # The maximum error is the difference between the maximum and minimum rating (4 in ItemLens),
     # and the avg-to-rating distances are taken from the data directly. Therefore, the worst case
     # scenario would be a rectangle of width (xx.max() - xx.min()) and height (test_samples["rating"].max() - test_samples["rating"].min())

@@ -36,6 +36,10 @@ class CollaborativeFilteringModel(LightningModule):
 
         """
         super().__init__()
+
+        num_users = max(num_users, num_items)
+        num_items = max(num_users, num_items)
+
         self.user_embedding = nn.Embedding(num_users, embedding_dim)
         self.item_embedding = nn.Embedding(num_items, embedding_dim)
         self.user_bias = nn.Embedding(num_users, 1)
@@ -67,15 +71,17 @@ class CollaborativeFilteringModel(LightningModule):
 
     def forward(self, user_ids, item_ids):
         user_embeds = self.user_embedding(user_ids)
-        item_embeds = self.item_embedding(item_ids)
+        # item_embeds = self.item_embedding(item_ids)
+        item_embeds = self.user_embedding(item_ids)
 
-        user_embeds = self.user_dropout(user_embeds)
-        item_embeds = self.item_dropout(item_embeds)
+        # user_embeds = self.user_dropout(user_embeds)
+        # item_embeds = self.item_dropout(item_embeds)
 
         dot_product = torch.sum(user_embeds * item_embeds, dim=1, keepdim=True)
 
         user_bias = self.user_bias(user_ids)
-        item_bias = self.item_bias(item_ids)
+        # item_bias = self.item_bias(item_ids)
+        item_bias = self.user_bias(item_ids)
 
         prediction = (
             dot_product + user_bias + item_bias + self.global_bias
@@ -106,6 +112,7 @@ class CollaborativeFilteringModel(LightningModule):
         rating_pred_clamped = self.clamp_ratings(rating_pred)
 
         self.rmse.update(rating_pred_clamped, ratings)
+        # self.rmse.update(rating_pred, ratings)
         self.log("rmse", self.rmse, on_step=False, on_epoch=True, prog_bar=True)
 
     def predict_step(self, batch, batch_idx, dataloader_idx=None):
@@ -116,6 +123,7 @@ class CollaborativeFilteringModel(LightningModule):
         rating_pred_clamped = self.clamp_ratings(rating_pred)
 
         return rating_pred_clamped
+        # return rating_pred
 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.parameters(), lr=self.lr, weight_decay=self.l2_reg)

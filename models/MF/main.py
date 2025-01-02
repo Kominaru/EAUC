@@ -16,18 +16,18 @@ from os import path
 from save_model_outputs import save_model_outputs
 
 
-MODEL = "CrossAttMF"
+MODEL = "MF"
 
 
 # Needs to be in a function for PyTorch Lightning workers to work properly in Windows systems
 def train_MF(
     dataset_name="ml-1m",
-    embedding_dim=8,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
+    embedding_dim=256,  # 128 for tripadvisor-london and ml-100k, 8 for douban-monti, 512 for the rest
     data_dir="data",
     max_epochs=1000,
-    batch_size=2**15,
+    batch_size=2**10,
     num_workers=4,
-    l2_reg=1e-5,  # 1e-4 for tripadvisor-london and ml-100k
+    l2_reg=1e-3,  # 1e-4 for tripadvisor-london and ml-100k
     learning_rate=1e-3,  # 5e-4 for ml-100k
     dropout=0.0,
     verbose=0,
@@ -52,6 +52,8 @@ def train_MF(
         dataset_name=dataset_name,
         verbose=verbose,
     )
+
+    exit()
 
     # Initialize the collaborative filtering model
     if MODEL == "MF":
@@ -196,9 +198,9 @@ if __name__ == "__main__":
 
         # Bounded region of parameter space
         pbounds = {
-            "embedding_dim": (2, 6),  # 8 to 1024
+            "embedding_dim": (3, 10),  # 8 to 1024
             "l2_reg": (-6, -2),  # 1e-6 to 1e-2
-            "learning_rate": (-5, -3),  # 1e-5 to 1e-2
+            "learning_rate": (-4, -2),  # 1e-5 to 1e-2
         }
 
         def train_MF_tune(embedding_dim, l2_reg, learning_rate):

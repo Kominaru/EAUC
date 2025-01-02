@@ -11,44 +11,71 @@ from src.avg_bias_auc import compute_avg_bias_auc
 
 OUTPUT_DIR = "outputs/"
 
+DATASET_NAMES = {
+    "ml-1m": "MovieLens 1M",
+    "ml-100k": "MovieLens 100K",
+    "ml-10m": "MovieLens 10M",
+    "douban-monti": "Douban Monti",
+    "tripadvisor-london": "TripAdvisor",
+    "kiva-ml-17": "Kiva Microloans 2017",
+    "gdsc1": "GDSC1",
+    "ctrpv2": "CTRPv2",
+    "dot_2023": "IMF DOTS 2023",
+    "netflix-prize": "Netflix Prize",
+}
+
 COLORS = {
-    "MF": "green",
+    "MF": "#8f4de1",
     "MF_correction_lr": "red",
-    "MF_correction_linear": "red",
+    "MF_correction_linear": "#8f4de1",
     "Random": "gray",
-    "GLOCAL_K": "blue",
+    "GLOCAL_K": "#60c138",
     "GLOCAL_K_correction_lr": "lightblue",
-    "GCMC": "red",
+    "GCMC": "#dd3dbb",
     "GCMC_correction_lr": "lightgreen",
-    "BAYESIAN_SVD++": "violet",
-    "BAYESIAN_SVD++_correction_lr": "burlywood",
-    "MF_correction_linear_sigmoid": "orange",
+    "BAYESIAN_SVD++": "#daa91f",
+    "BAYESIAN_SVD++_correction_linear": "burlywood",
+    "MF_correction_linear_sigmoid": "#8f4de1",
     "MF_correction_linear_bins": "yellow",
     "MF_correction_linear_sigmoid_bins": "brown",
-    "MF_correction_random_forest": "aquamarine",
-    "MF_correction_linear_balanced": "pink",
+    "MF_correction_random_forest": "#8f4de1",
+    "MF_correction_linear_balanced": "#8f4de1",
     "BAYESIAN_SVD++_correction_linear_sigmoid": "burlywood",
+    "average": "black",
 }
 
 CLEAN_NAMES = {
     "MF": "MF",
     "MF_correction_lr": "MF + Linear correction",
-    "MF_correction_linear": "MF + Linear correction",
+    "MF_correction_linear": "MF w/ Linear corr. ",
     "Random": "Random",
     "GLOCAL_K": "GLOCAL-K",
     "GCMC": "GC-MC",
     "BAYESIAN_SVD++": "Bayesian SVD++",
-    "MF_correction_linear_sigmoid": "MF + Linear + Sigmoid correction",
+    "BAYESIAN_SVD++_correction_linear": "Bayesian SVD++ + Linear correction",
+    "MF_correction_linear_sigmoid": "MF w/ Linear corr.  \n+ ML-RUS (Sigmoid)",
     "MF_correction_linear_bins": "MF + Linear correction (bins)",
     "MF_correction_linear_sigmoid_bins": "MF + Linear + Sigmoid correction (bins)",
-    "MF_correction_random_forest": "MF + Random Forest correction",
-    "MF_correction_linear_balanced": "MF + Linear correction (balanced data)",
+    "MF_correction_random_forest": "MF w/ Random Forest corr.",
+    "MF_correction_linear_balanced": "MF w/ Linear corr.  \n+ ML-RUS (Clipping)",
     "BAYESIAN_SVD++_correction_linear_sigmoid": "Bayesian SVD++ + Linear + Sigmoid correction",
+    "average": "Dyadic Average",
+}
+
+CORRECTION_LINE_STYLES = {
+    "MF_correction_linear": "--",
+    "MF_correction_linear_sigmoid": "-.",
+    "MF_correction_linear_balanced": ":",
+    "MF_correction_random_forest": (0, (1, 10)),
 }
 
 
 def plot_avg_bias_error(
-    train_samples_dict: dict, test_samples_dict: dict = None, num_bins: int = 100, tails: Literal[1, 2] = 1
+    train_samples_dict: dict,
+    test_samples_dict: dict = None,
+    num_bins: int = 100,
+    tails: Literal[1, 2] = 1,
+    dataset: str = "ml-1m",
 ) -> None:
     """
     Plots the error of the models depending on the distance from the real rating to the average of the user and item average ratings
@@ -69,6 +96,22 @@ def plot_avg_bias_error(
     test_samples_dict = test_samples_dict or train_samples_dict
 
     plt.figure(figsize=(5, 5))
+    plt.rcParams.update({"font.size": 16})
+
+    # Find the absolute minimum and maximum rating across all training sets
+    min_rating = np.inf
+    max_rating = -np.inf
+
+    for model_name in train_samples_dict:
+        for i in range(len(train_samples_dict[model_name])):
+            min_rating = min(min_rating, train_samples_dict[model_name][i]["rating"].min())
+            max_rating = max(max_rating, train_samples_dict[model_name][i]["rating"].max())
+
+    for model_name in test_samples_dict:
+        for i in range(len(test_samples_dict[model_name])):
+            min_rating = min(min_rating, test_samples_dict[model_name][i]["rating"].min())
+            max_rating = max(max_rating, test_samples_dict[model_name][i]["rating"].max())
+
     for model_name in train_samples_dict:
         xx = []
         yy = []
@@ -100,7 +143,7 @@ def plot_avg_bias_error(
 
             bins = np.linspace(
                 left,
-                (test_samples["rating"].max() - test_samples["rating"].min()),
+                max_rating - min_rating,
                 num_bins,
             )
 
@@ -114,13 +157,23 @@ def plot_avg_bias_error(
 
             errors_by_dist = errors_by_dist[~errors_by_dist.isna()]
 
+            print(
+                model_name,
+                i,
+                max(errors_by_dist.index.to_series().apply(lambda x: x.mid).to_list()),
+                len(test_samples),
+            )
+
             xx += errors_by_dist.index.to_series().apply(lambda x: x.mid).to_list()
             yy += errors_by_dist.values.tolist()
 
         df = pd.DataFrame({"xx": xx, "yy": yy})
+
         # Compute the mean and standard deviation of the error in each bin
         df = df.groupby("xx")["yy"].agg(["mean", "std"])
-        df.dropna(inplace=True)
+
+        # df.dropna(inplace=True)
+        df.dropna(subset=["mean"], inplace=True)
 
         xx = df.index
         yy = df["mean"]
@@ -128,7 +181,13 @@ def plot_avg_bias_error(
         # Make axes square
 
         # Plot the error by distance
-        plt.plot(xx, yy, label=CLEAN_NAMES[model_name], color=COLORS[model_name])
+        plt.plot(
+            xx,
+            yy,
+            label=CLEAN_NAMES[model_name],
+            color=COLORS[model_name],
+            linestyle=CORRECTION_LINE_STYLES.get(model_name, "-"),
+        )
 
         # Plot the standard deviation of the error in each bin as a shaded area
         plt.fill_between(
@@ -164,24 +223,28 @@ def plot_avg_bias_error(
     #     label="Maximum area",
     # )
 
-    plt.xlim(0, (max_rating - min_rating))
-    plt.ylim(0, (max_rating - min_rating))
+    plt.xlim(0, xx[-1])
+    plt.ylim(0, xx[-1])
     plt.grid(alpha=0.3)
 
     plt.xlabel("Rating Eccentricity $Ecc_{ui}$")
     plt.ylabel("Prediction Error $|r_{ui} - \hat{r}_{ui}|$")
     # plt.title(f"{set_string.capitalize()} Prediction Error vs. Rating Eccentricity")
-    plt.title("Netflix Prize")
-    plt.legend(loc="upper left")
+    plt.title(DATASET_NAMES[dataset])
 
-    plt.savefig(f"outputs/avg_bias_auc_{set_string.lower()}.pdf")
+    if "MF_correction_linear" in train_samples_dict or dataset == "ml-1m":
+        plt.legend(loc="upper left", fontsize=14)
+
+    plt.tight_layout()
+
+    plt.savefig(f"outputs/avg_bias_auc_{set_string.lower()}_{dataset}.pdf")
     plt.show()
 
 
 def plot_ratings_vs_preds_lineplot(
     train_samples: pd.DataFrame,
     test_samples: pd.DataFrame,
-    dmr_range: tuple[int, int] = None,
+    dmr_ranges: list[tuple[int, int]],
 ) -> None:
     """
     Plots the ratings vs predictions of a model as a lineplot + shaded area chart
@@ -193,7 +256,7 @@ def plot_ratings_vs_preds_lineplot(
     """
 
     # Force a square figure
-    plt.figure(figsize=(5, 5))
+    plt.figure(figsize=(6.25, 5))
 
     # Compute the average rating per user and item
     user_avg_ratings = train_samples.groupby("user_id")["rating"].mean()
@@ -206,30 +269,38 @@ def plot_ratings_vs_preds_lineplot(
     # Filter out samples for which the user or item average rating is not available
     test_samples = test_samples[~test_samples["dmr_ui"].isna()]
 
-    # Filter out samples for which the user or item average rating is not in the specified range
-    if dmr_range is not None:
-        test_samples = test_samples[test_samples["dmr_ui"].between(*dmr_range)]
+    styles = ["-.", ":"]
 
-    # Plot the ratings vs predictions as a mean lineplot + shaded area chart
+    for i, dmr_range in enumerate(dmr_ranges):
+        # Filter out samples for which the user or item average rating is not in the specified range
 
-    rating_preds = test_samples.groupby("rating")["pred"].agg(["mean", "std"])
+        test_samples_dmr = test_samples[test_samples["dmr_ui"].between(*dmr_range)]
 
-    plt.plot(rating_preds.index, rating_preds["mean"], color="red", label="Prediction Mean (MF)")
-    plt.fill_between(
-        rating_preds.index,
-        rating_preds["mean"] - rating_preds["std"],
-        rating_preds["mean"] + rating_preds["std"],
-        alpha=0.05,
-        color="red",
-        label="Prediction Std (MF)",
-    )
+        # Plot the ratings vs predictions as a mean lineplot + shaded area chart
+
+        rating_preds = test_samples_dmr.groupby("rating")["pred"].agg(["mean", "std"])
+
+        plt.plot(
+            rating_preds.index,
+            rating_preds["mean"],
+            color="red",
+            label=f"$(u, i)$ pairs with\n${dmr_range[0]} \leq DMV_{{ui}} \leq {dmr_range[1]}$",
+            linestyle=styles[i],
+        )
+        plt.fill_between(
+            rating_preds.index,
+            rating_preds["mean"] - rating_preds["std"],
+            rating_preds["mean"] + rating_preds["std"],
+            alpha=0.05,
+            color="red",
+        )
 
     # Plot the ideal line
     plt.plot(
         [test_samples["rating"].min(), test_samples["rating"].max()],
         [test_samples["rating"].min(), test_samples["rating"].max()],
         color="black",
-        label="Ideal regressor",
+        label="Ideal regressor\nfor any $DMV_{ui}$",
         linestyle="--",
     )
 
@@ -242,14 +313,8 @@ def plot_ratings_vs_preds_lineplot(
     # plt.xlim(1, 5)
     # plt.ylim(1, 5)
 
-    if dmr_range is not None:
-        plt.title(
-            f"Test ratings vs. predictions for $(u, i)$ \n pairs with ${dmr_range[0]} \leq DMR_{{ui}} \leq {dmr_range[1]}$"
-        )
-    else:
-        plt.title(f"Test ratings vs. predictions\nfor all $(u, i)$ pairs")
-
-    plt.legend()
+    plt.title(f"Test ratings vs. predictions \n depending on $DMV_{{ui}}$")
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
     plt.tight_layout()
 
     plt.savefig(f"outputs/ratings_vs_preds_lineplot.pdf")
@@ -292,61 +357,64 @@ if __name__ == "__main__":
 
             model_predictions[model] = {"train": train_predictions, "test": test_predictions}
 
-    plot_ratings_vs_preds_lineplot(
-        model_predictions[models[0]]["train"][0], model_predictions[models[0]]["test"][0], dmr_range=(4, 4.5)
-    )
+    # plot_ratings_vs_preds_lineplot(
+    #     model_predictions[models[0]]["train"][0],
+    #     model_predictions[models[0]]["test"][0],
+    #     dmr_ranges=[(4, 4.5), (2, 2.5)],
+    # )
 
-    plt.figure(figsize=(5, 5))
+    # exit()
+    # plt.figure(figsize=(5, 5))
 
-    # Print number of samples in test set for each model
-    for model in models:
-        print(f"{model}: {len(model_predictions[model]['test'][0]['pred'])}")
-        print("Max prediction:", model_predictions[model]["test"][0]["pred"].max())
-        print("Min prediction:", model_predictions[model]["test"][0]["pred"].min())
-        print("NA predictions:", model_predictions[model]["test"][0]["pred"].isna().sum())
+    # # Print number of samples in test set for each model
+    # for model in models:
+    #     print(f"{model}: {len(model_predictions[model]['test'][0]['pred'])}")
+    #     print("Max prediction:", model_predictions[model]["test"][0]["pred"].max())
+    #     print("Min prediction:", model_predictions[model]["test"][0]["pred"].min())
+    #     print("NA predictions:", model_predictions[model]["test"][0]["pred"].isna().sum())
 
-    for model in models:
-        # Plot a histogram of the predictions of each model
-        plt.hist(
-            model_predictions[model]["test"][0]["pred"],
-            bins=100,
-            alpha=0.5,
-            label=CLEAN_NAMES[model],
-            color=COLORS[model],
-        )
+    # for model in models:
+    #     # Plot a histogram of the predictions of each model
+    #     plt.hist(
+    #         model_predictions[model]["test"][0]["pred"],
+    #         bins=100,
+    #         alpha=0.5,
+    #         label=CLEAN_NAMES[model],
+    #         color=COLORS[model],
+    #     )
 
-    plt.hist(
-        model_predictions[model]["test"][0]["rating"],
-        bins=[0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5],
-        alpha=0.5,
-        label="Ratings",
-        color="black",
-    )
+    # plt.hist(
+    #     model_predictions[model]["test"][0]["rating"],
+    #     bins=[0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5],
+    #     alpha=0.5,
+    #     label="Ratings",
+    #     color="black",
+    # )
 
-    plt.xlabel("Prediction $\hat{r}_{ui}$")
-    plt.ylabel("Frequency")
-    plt.title("Distribution of Predictions")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    # plt.xlabel("Prediction $\hat{r}_{ui}$")
+    # plt.ylabel("Frequency")
+    # plt.title("Distribution of Predictions")
+    # plt.legend()
+    # plt.tight_layout()
+    # plt.show()
 
-    plt.figure(figsize=(5, 5))
-    for model in models:
-        # Take the first test sample of each model and plot the distribution of errors
-        plt.hist(
-            (model_predictions[model]["test"][0]["rating"] - model_predictions[model]["test"][0]["pred"]).abs(),
-            alpha=0.5,
-            label=CLEAN_NAMES[model],
-            color=COLORS[model],
-            bins=100,
-        )
+    # plt.figure(figsize=(5, 5))
+    # for model in models:
+    #     # Take the first test sample of each model and plot the distribution of errors
+    #     plt.hist(
+    #         (model_predictions[model]["test"][0]["rating"] - model_predictions[model]["test"][0]["pred"]).abs(),
+    #         alpha=0.5,
+    #         label=CLEAN_NAMES[model],
+    #         color=COLORS[model],
+    #         bins=100,
+    #     )
 
-    plt.xlabel("Prediction Absolute Error $|r_{ui} - \hat{r}_{ui}|$")
-    plt.ylabel("Frequency")
-    plt.title("Distribution of Prediction Errors")
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    # plt.xlabel("Prediction Absolute Error $|r_{ui} - \hat{r}_{ui}|$")
+    # plt.ylabel("Frequency")
+    # plt.title("Distribution of Prediction Errors")
+    # plt.legend()
+    # plt.tight_layout()
+    # plt.show()
 
     if "Random" in models:
         # Load the samples of a different model to compute the random predictions
@@ -359,12 +427,38 @@ if __name__ == "__main__":
 
         for i in range(len(train_predictions)):
             # Compute the random predictions
-            train_predictions[i]["pred"] = np.random.uniform(
-                train_predictions[i]["rating"].min(), train_predictions[i]["rating"].max(), len(train_predictions[i])
-            )
-            test_predictions[i]["pred"] = np.random.uniform(
-                test_predictions[i]["rating"].min(), test_predictions[i]["rating"].max(), len(test_predictions[i])
-            )
+            min_rating = train_predictions[i]["rating"].min()
+            max_rating = train_predictions[i]["rating"].max()
+            train_predictions[i]["pred"] = np.random.uniform(min_rating, max_rating, len(train_predictions[i]))
+            test_predictions[i]["pred"] = np.random.uniform(min_rating, max_rating, len(test_predictions[i]))
+
+            # train_predictions[i]["pred"] = train_predictions[i].sample(frac=1)["rating"].values
+            # test_predictions[i]["pred"] = train_predictions[i].sample(len(test_predictions[i]))["rating"].values
+
+            # train_item_ids = train_predictions[i]["item_id"].values
+            # test_item_ids = test_predictions[i]["item_id"].values
+
+            # train_ratings = train_predictions[i]["rating"].values
+            # test_ratings = test_predictions[i]["rating"].values
+
+            # train_preds = np.zeros_like(train_ratings)
+            # test_preds = np.zeros_like(test_ratings)
+
+            # for item_id in train_predictions[i]["item_id"].unique():
+            #     item_mask = item_id == train_item_ids
+            #     train_preds[item_mask] = np.random.permutation(train_ratings[item_mask])
+
+            # for item_id in test_predictions[i]["item_id"].unique():
+            #     item_mask = item_id == test_item_ids
+            #     train_item_mask = item_id == train_item_ids
+            #     if not train_item_mask.any():
+            #         test_preds[item_mask] = train_ratings.mean()
+            #         continue
+            #     # sample from the train ratings
+            #     test_preds[item_mask] = np.random.choice(train_ratings[train_item_mask], len(test_ratings[item_mask]))
+
+            # train_predictions[i]["pred"] = train_preds
+            # test_predictions[i]["pred"] = test_preds
 
         model_predictions["Random"] = {"train": train_predictions, "test": test_predictions}
 
@@ -391,6 +485,8 @@ if __name__ == "__main__":
             test_predictions[i]["pred"] = (
                 test_predictions[i]["user_id"].map(avg_user) + test_predictions[i]["item_id"].map(avg_item)
             ) / 2
+
+            test_predictions[i]["pred"] = test_predictions[i]["pred"].fillna(train_predictions[i]["rating"].mean())
 
         model_predictions["average"] = {"train": train_predictions, "test": test_predictions}
 
@@ -446,7 +542,9 @@ if __name__ == "__main__":
     print("------------")
 
     # Plot the train error by distance to the average rating for each model
-    plot_avg_bias_error({model: model_predictions[model]["train"] for model in models}, num_bins=25, tails=tails)
+    plot_avg_bias_error(
+        {model: model_predictions[model]["train"] for model in models}, num_bins=25, tails=tails, dataset=args.dataset
+    )
 
     # Plot the test error by distance to the average rating for each model
     plot_avg_bias_error(
@@ -454,4 +552,5 @@ if __name__ == "__main__":
         {model: model_predictions[model]["test"] for model in models},
         num_bins=25,
         tails=tails,
+        dataset=args.dataset,
     )

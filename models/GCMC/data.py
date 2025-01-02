@@ -1,4 +1,5 @@
 """MovieLens dataset"""
+
 import os
 import re
 
@@ -87,6 +88,45 @@ def load_and_format_doubanmonti_data(dataset_name):
     test_df = rating_matrix_to_dataframe(test_data)
 
     return all_df, train_df, test_df
+
+
+def load_data_tripadvisor(path="./", frac=0.1, seed=1234):
+
+    df = pd.read_pickle(path + "reviews.pkl")
+
+    df = df[["userId", "restaurantId", "rating"]]
+    df.columns = ["user_id", "item_id", "rating"]
+
+    df = df.drop_duplicates(subset=["user_id", "item_id"], keep="first")
+
+    df["user_id"] = df["user_id"].astype("category").cat.codes
+    df["item_id"] = df["item_id"].astype("category").cat.codes
+
+    postsPerItem = df.groupby(["item_id"]).size()
+    df = df[np.in1d(df.item_id, postsPerItem[postsPerItem >= 10].index)]
+
+    postsPerUser = df.groupby(["user_id"]).size()
+    df = df[np.in1d(df.user_id, postsPerUser[postsPerUser >= 10].index)]
+
+    df = df.dropna()
+
+    df["user_id"] = df["user_id"].astype("category").cat.codes
+    df["item_id"] = df["item_id"].astype("category").cat.codes
+
+    df["rating"] = df["rating"] / 10
+
+    # Split into train and test sets
+
+    # Rename item_id to movie_id
+    df.columns = ["user_id", "movie_id", "rating"]
+
+    test_idx = df.sample(frac=frac).index
+    train_idx = df.index.difference(test_idx)
+
+    train_df = df.loc[train_idx].reset_index(drop=True)
+    test_df = df.loc[test_idx].reset_index(drop=True)
+
+    return df, train_df, test_df
 
 
 class MovieLens(object):
@@ -217,6 +257,53 @@ class MovieLens(object):
             self.all_rating_info, self.all_train_rating_info, self.test_rating_info = load_and_format_doubanmonti_data(
                 self._name
             )
+        elif self._name == "gdsc1":
+            self.all_rating_info = pd.read_csv("data/gdsc1/gdsc1_processed.csv")
+            self.all_rating_info = self.all_rating_info.sample(frac=0.3).reset_index(drop=True)
+            self.all_rating_info = self.all_rating_info[["user_id", "item_id", "rating"]]
+            self.all_rating_info.columns = ["user_id", "movie_id", "rating"]
+            self.all_train_rating_info = self.all_rating_info.sample(frac=0.9)
+            self.test_rating_info = self.all_rating_info.drop(self.all_train_rating_info.index)
+
+            # Discretize the ratings in the training set (by rounding to the nearest integer)
+            self.all_train_rating_info["rating"] = np.round(self.all_train_rating_info["rating"]).astype(int)
+
+        elif self._name == "ctrpv2":
+            self.all_rating_info = pd.read_csv("data/ctrpv2/ctrpv2_processed.csv")
+            self.all_rating_info = self.all_rating_info[["user_id", "item_id", "rating"]]
+            self.all_rating_info.columns = ["user_id", "movie_id", "rating"]
+            self.all_train_rating_info = self.all_rating_info.sample(frac=0.9)
+            self.test_rating_info = self.all_rating_info.drop(self.all_train_rating_info.index)
+
+            # Discretize the ratings in the training set (by rounding to the nearest integer)
+            self.all_train_rating_info["rating"] = np.round(self.all_train_rating_info["rating"]).astype(int)
+
+        elif self._name == "tripadvisor-london":
+            self.all_rating_info, self.all_train_rating_info, self.test_rating_info = load_data_tripadvisor(
+                path="data/tripadvisor-london/", frac=0.1, seed=1234
+            )
+
+        elif self._name == "dot_2023":
+            self.all_rating_info = pd.read_csv("data/dot_2023/dot_2023_processed.csv")
+            self.all_rating_info = self.all_rating_info[["user_id", "item_id", "rating"]]
+            self.all_rating_info.columns = ["user_id", "movie_id", "rating"]
+            self.all_train_rating_info = self.all_rating_info.sample(frac=0.9)
+            self.test_rating_info = self.all_rating_info.drop(self.all_train_rating_info.index)
+
+            # Discretize the ratings in the training set (by rounding to the nearest integer)
+            self.all_train_rating_info["rating"] = np.round(self.all_train_rating_info["rating"]).astype(int)
+
+        elif self._name == "kiva-ml-17":
+            self.all_rating_info = pd.read_csv("data/kiva-ml-17/user_profiles.csv")
+            self.all_rating_info = self.all_rating_info[["user_id", "item_id", "rating"]]
+            self.all_rating_info["user_id"] = self.all_rating_info["user_id"].astype("category").cat.codes
+            self.all_rating_info.columns = ["user_id", "movie_id", "rating"]
+            self.all_train_rating_info = self.all_rating_info.sample(frac=0.9)
+            self.test_rating_info = self.all_rating_info.drop(self.all_train_rating_info.index)
+
+            # Discretize the ratings in the training set to the nearest 0.25
+            self.all_train_rating_info["rating"] = np.round(self.all_train_rating_info["rating"] * 4) / 4
+
         else:
             raise NotImplementedError
         self._load_raw_user_info()
@@ -576,6 +663,12 @@ class MovieLens(object):
                 columns=["id"],
             )
 
+        elif self._name in ["tripadvisor-london", "dot_2023", "ctrpv2", "gdsc1", "kiva-ml-17"]:
+            self.user_info = pd.DataFrame(
+                np.unique(self.all_rating_info["user_id"].values.astype(np.int32)),
+                columns=["id"],
+            )
+
         else:
             raise NotImplementedError
 
@@ -653,6 +746,8 @@ class MovieLens(object):
             GENRES = GENRES_ML_10M
         elif self._name == "douban-monti":
             GENRES = None
+        elif self._name in ["tripadvisor-london", "dot_2023", "ctrpv2", "gdsc1", "kiva-ml-17"]:
+            GENRES = None
         else:
             raise NotImplementedError
 
@@ -698,6 +793,11 @@ class MovieLens(object):
             self.movie_info = movie_info.drop(columns=["genres"])
 
         elif self._name == "douban-monti":
+            self.movie_info = pd.DataFrame(
+                np.unique(self.all_rating_info["movie_id"].values.astype(np.int32)),
+                columns=["id"],
+            )
+        elif self._name in ["tripadvisor-london", "dot_2023", "ctrpv2", "gdsc1", "kiva-ml-17"]:
             self.movie_info = pd.DataFrame(
                 np.unique(self.all_rating_info["movie_id"].values.astype(np.int32)),
                 columns=["id"],
