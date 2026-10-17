@@ -7,7 +7,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from src.avg_bias_auc import compute_avg_bias_auc
+from eauc import eauc as compute_avg_bias_auc
 
 OUTPUT_DIR = "outputs/"
 

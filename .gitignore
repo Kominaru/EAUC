@@ -178,3 +178,5 @@ models/MRMA/pmf/weights
 log/
 callback_result_oprobit_fold_9.pkl
 models/MF/MF.zip
+
+*.egg-info/
