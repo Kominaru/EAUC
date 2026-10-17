@@ -19,10 +19,10 @@ def save_model_outputs(train_df, test_df, model_name, dataset_name, model_params
         i = max([int(f.split(".")[0].split("_")[-1]) for f in files]) + 1
     
     # Save train_df and test_df to files
-    train_df.to_csv(f"outputs/{dataset_name}/{model_name}/train_outputs{i}.csv", index=False)
+    train_df.to_csv(f"outputs/{dataset_name}/{model_name}/train_outputs_{i}.csv", index=False)
     test_df.to_csv(f"outputs/{dataset_name}/{model_name}/test_outputs_{i}.csv", index=False)
     
     # Write model_params to params.txt file
     with open(f"outputs/{dataset_name}/{model_name}/params.txt", "a") as f:
-        "\t".join([i, datetime.now()]+[f"{k}: {v}" for k, v in model_params.items()])
-        f.write("\n")
+        s = "\t".join([str(i), str(datetime.now())]+[f"{k}: {v}" for k, v in model_params.items()])
+        f.write(s+"\n")

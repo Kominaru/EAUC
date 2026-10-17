@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eauc"
+version = "0.1.0"
+description = "Eccentricity-Area Under the Curve (EAUC): measure and mitigate eccentricity bias in dyadic regression models."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "Jorge Paz-Ruza", email = "j.ruza@udc.es" }]
+keywords = ["recommender-systems", "fairness", "evaluation-metrics", "dyadic-regression", "bias", "matrix-factorization"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["numpy", "pandas>=1.5", "scikit-learn", "scipy"]
+
+[project.optional-dependencies]
+plot = ["matplotlib"]
+dev = ["pytest", "matplotlib"]
+
+[project.scripts]
+eauc = "eauc.cli:main"
+
+[project.urls]
+Paper = "https://arxiv.org/abs/2401.10690"
+Source = "https://github.com/Kominaru/EAUC"
+
+[tool.setuptools.packages.find]
+include = ["eauc*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
