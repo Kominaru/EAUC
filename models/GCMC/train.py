@@ -14,14 +14,15 @@ import torch as th
 import torch.nn as nn
 from data import MovieLens
 from model import BiDecoder, GCMCLayer
-from save_model_outputs import save_model_outputs
 from utils import (
+    MetricLogger,
     get_activation,
     get_optimizer,
-    MetricLogger,
     torch_net_info,
     torch_total_param_num,
 )
+
+from eauc import save_model_outputs
 
 
 class Net(nn.Module):
@@ -232,7 +233,6 @@ def train(args):
     )
 
     # Export test and train rating dfs to csv
-    os.makedirs("outputs/GC_MC", exist_ok=True)
     # Rename movie_id to item_id
     dataset.train_rating_info.rename(columns={"movie_id": "item_id"}, inplace=True)
     dataset.test_rating_info.rename(columns={"movie_id": "item_id"}, inplace=True)

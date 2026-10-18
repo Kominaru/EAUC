@@ -21,6 +21,7 @@ dependencies = ["numpy", "pandas>=1.5", "scikit-learn", "scipy"]
 
 [project.optional-dependencies]
 plot = ["matplotlib"]
+experiments = ["matplotlib", "h5py", "requests"]
 dev = ["pytest", "matplotlib"]
 
 [project.scripts]
@@ -35,3 +36,10 @@ include = ["eauc*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["models/GCMC"]  # third-party code, kept close to upstream
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

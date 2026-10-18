@@ -3,7 +3,18 @@ import pandas as pd
 import pytest
 from scipy.stats import kstest, uniform
 
-from eauc import EccentricityCorrector, add_eccentricity, dataset_ks, eauc, eccentricity_error_curve, make_probe
+from eauc import (
+    EccentricityCorrector,
+    add_eccentricity,
+    dataset_ks,
+    eauc,
+    eccentricity_error_curve,
+    entity_ks,
+    load_model_outputs,
+    make_probe,
+    ml_rus,
+    save_model_outputs,
+)
 from eauc.cli import main
 
 
@@ -74,7 +85,12 @@ def test_custom_columns(data):
     ren = {"user_id": "drug", "item_id": "cell", "rating": "ic50", "pred": "yhat"}
     expected = eauc(train, test)
     got = eauc(
-        train.rename(columns=ren), test.rename(columns=ren), pred_col="yhat", user_col="drug", item_col="cell", value_col="ic50"
+        train.rename(columns=ren),
+        test.rename(columns=ren),
+        pred_col="yhat",
+        user_col="drug",
+        item_col="cell",
+        value_col="ic50",
     )
     assert got == pytest.approx(expected)
 
@@ -99,13 +115,20 @@ def test_corrector_reduces_dmv_bias(strategy):
     rng = np.random.default_rng(1)
     n = 6000
     df = pd.DataFrame(
-        {"user_id": rng.integers(0, 80, n), "item_id": rng.integers(0, 50, n), "rating": rng.integers(1, 6, n).astype(float)}
+        {
+            "user_id": rng.integers(0, 80, n),
+            "item_id": rng.integers(0, 50, n),
+            "rating": rng.integers(1, 6, n).astype(float),
+        }
     )
     train, test = df.iloc[:5000].copy(), df.iloc[5000:].copy()
-    dmv = lambda d: (d["user_id"].map(train.groupby("user_id")["rating"].mean()) + d["item_id"].map(train.groupby("item_id")["rating"].mean())) / 2
     for d in (train, test):
-        d["pred"] = np.clip(0.8 * dmv(d).fillna(3) + 0.2 * d["rating"], 1, 5)  # strongly biased to the DMV
-    train_rest, probe, test_rest = make_probe(train, test)
+        dmv = (
+            d["user_id"].map(train.groupby("user_id")["rating"].mean())
+            + d["item_id"].map(train.groupby("item_id")["rating"].mean())
+        ) / 2
+        d["pred"] = np.clip(0.8 * dmv.fillna(3) + 0.2 * d["rating"], 1, 5)  # strongly biased to the DMV
+    _, probe, test_rest = make_probe(train, test)
     corrector = EccentricityCorrector(strategy).fit(train, probe)
     corrected = corrector.transform(test_rest)
     assert eauc(train, corrected) < eauc(train, test_rest)
@@ -128,6 +151,47 @@ def test_cli(tmp_path, data, capsys):
     assert main(["score", "--train", str(tmp_path / "train.csv"), "--test", str(tmp_path / "test.csv")]) == 0
     assert "EAUC=" in capsys.readouterr().out
     assert main(["ks", "--data", str(tmp_path / "train.csv")]) == 0
-    assert main(["correct", "--train", str(tmp_path / "train.csv"), "--test", str(tmp_path / "test.csv"), "--out", str(tmp_path / "o.csv")]) == 0
+    assert (
+        main(
+            [
+                "correct",
+                "--train",
+                str(tmp_path / "train.csv"),
+                "--test",
+                str(tmp_path / "test.csv"),
+                "--out",
+                str(tmp_path / "o.csv"),
+            ]
+        )
+        == 0
+    )
     out = capsys.readouterr().out
     assert "before" in out and "after" in out and (tmp_path / "o.csv").exists()
+
+
+def test_entity_ks_is_per_entity(data):
+    train, _ = data
+    per_user = entity_ks(train, "user_id")
+    assert per_user.index.name == "user_id"
+    assert len(per_user) == train["user_id"].nunique()
+    assert per_user.between(0, 1).all()
+
+
+def test_ml_rus_equalises_value_counts_inside_groups():
+    probe = pd.DataFrame({"rating": [1.0] * 6 + [2.0] * 2 + [1.0] * 3 + [2.0] * 3, "group": [0] * 8 + [1] * 6})
+    balanced = ml_rus(probe, probe["group"], "rating")
+    assert balanced.groupby(["group", "rating"]).size().to_dict() == {
+        (0, 1.0): 2,
+        (0, 2.0): 2,
+        (1, 1.0): 3,
+        (1, 2.0): 3,
+    }
+
+
+def test_save_and_load_model_outputs_number_runs(tmp_path, data):
+    train, test = data
+    assert save_model_outputs(train, test, "M", "d", {"lr": 0.1}, root=tmp_path) == 1
+    assert save_model_outputs(train, test, "M", "d", root=tmp_path) == 2
+    loaded_train, loaded_test = load_model_outputs("M", "d", 2, root=tmp_path)
+    assert len(loaded_train) == len(train) and len(loaded_test) == len(test)
+    assert len((tmp_path / "d" / "M" / "params.txt").read_text().splitlines()) == 2

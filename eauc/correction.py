@@ -4,7 +4,7 @@ A trained dyadic regressor ``f`` is left untouched. A small *correction set* (a 
 predictions is used to fit a function that maps ``(prediction, user mean, item mean)`` to the observed
 value, which undoes part of the model's pull towards the Dyadic Mean Value. The probe can be balanced with
 ML-RUS (Multi-Level Random Under-Sampling): inside every (user mean, item mean) bin, every observed value is
-under-sampled to the count of the rarest one.
+under-sampled to the count of the rarest one (see :func:`ml_rus`).
 """
 
 from __future__ import annotations
@@ -39,6 +39,34 @@ def make_probe(
     probe = pd.concat([test_probe, train_probe])
     train_rest = train.drop(train_probe.index)
     return train_rest, probe, test_rest
+
+
+def ml_rus(
+    probe: pd.DataFrame,
+    group,
+    value_col: str = "rating",
+    levels=None,
+    random_state: int = 0,
+) -> pd.DataFrame:
+    """ML-RUS balancing: inside every ``group`` (e.g. a user-mean x item-mean bin), under-sample each
+    observed value to the count of the rarest one.
+
+    Args:
+        probe: Rows to balance.
+        group: Group id of every row (array-like aligned with ``probe``).
+        value_col: Column holding the observed value.
+        levels: Optional array-like with a discretised version of the value (for continuous targets);
+            rows are balanced across its distinct values instead of the raw ones. Rows with a missing
+            level are dropped.
+        random_state: Seed of the under-sampling.
+    """
+    frame = probe.assign(_group=np.asarray(group), _level=probe[value_col] if levels is None else np.asarray(levels))
+    parts = []
+    for _, in_group in frame.groupby("_group", sort=True):
+        smallest = max(in_group["_level"].value_counts().min(), 1)
+        for _, in_level in in_group.groupby("_level", sort=True):
+            parts.append(in_level.sample(min(len(in_level), smallest), random_state=random_state))
+    return pd.concat(parts).drop(columns=["_group", "_level"])
 
 
 class EccentricityCorrector:
@@ -89,25 +117,16 @@ class EccentricityCorrector:
         return np.trunc(means.to_numpy() / self.bin_width).astype(int)
 
     def _balance(self, probe: pd.DataFrame) -> pd.DataFrame:
-        """ML-RUS: in each (user mean, item mean) bin, under-sample every value to the rarest one."""
-        probe = probe.copy()
-        probe["_ui_bin"] = self._bin(probe["user_mean"]) * 10 + self._bin(probe["item_mean"])
-        key = self.value_col
+        group = self._bin(probe["user_mean"]) * 10 + self._bin(probe["item_mean"])
+        levels = None
         if self.n_rating_bins is not None:
             edges = np.linspace(self.value_min_, self.value_max_, self.n_rating_bins + 1)
-            probe["_level"] = pd.cut(probe[self.value_col], bins=edges, labels=False)
-            key = "_level"
-
-        parts = []
-        for _, ui_group in probe.groupby("_ui_bin", sort=True):
-            smallest = max(ui_group[key].value_counts().min(), 1)
-            for _, level_group in ui_group.groupby(key, sort=True):
-                parts.append(level_group.sample(min(len(level_group), smallest), random_state=self.random_state))
-        return pd.concat(parts).drop(columns=["_ui_bin"] + (["_level"] if self.n_rating_bins else []))
+            levels = pd.cut(probe[self.value_col], bins=edges, labels=False)
+        return ml_rus(probe, group, self.value_col, levels, self.random_state)
 
     # -- API -----------------------------------------------------------------------------------------
 
-    def fit(self, train: pd.DataFrame, probe: pd.DataFrame) -> "EccentricityCorrector":
+    def fit(self, train: pd.DataFrame, probe: pd.DataFrame) -> EccentricityCorrector:
         """Fit the correction.
 
         Args:
