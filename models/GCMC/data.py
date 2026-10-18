@@ -4,13 +4,13 @@ import os
 import re
 
 import dgl
+import h5py
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 import torch as th
-from dgl.data.utils import download, extract_archive, get_download_dir
+from dgl.data.utils import get_download_dir
 from utils import to_etype_name
-import h5py
 
 _urls = {
     "ml-100k": "http://files.grouplens.org/datasets/movielens/ml-100k.zip",
@@ -75,10 +75,6 @@ def load_and_format_doubanmonti_data(dataset_name):
                 "rating": ratings[nonzero_indices],
             }
         )
-
-        # Min and max ratings
-        min_rating = df["rating"].min()
-        max_rating = df["rating"].max()
 
         return df
 

@@ -135,6 +135,37 @@ def eccentricity_error_curve(
     return curve.reset_index(drop=True)
 
 
+def entity_ks(
+    data: pd.DataFrame,
+    by: str,
+    value_col: str = "rating",
+) -> pd.Series:
+    """Kolmogorov-Smirnov distance of every entity's observed values to a uniform distribution.
+
+    The reference is uniform over ``[min, max]`` of the whole ``value_col``. Returns one statistic per
+    distinct value of the ``by`` column (``user_col`` or ``item_col``).
+    """
+    _check_columns(data, [by, value_col], "data")
+    lo, hi = data[value_col].min(), data[value_col].max()
+    if hi == lo:
+        raise ValueError("All observed values are identical; the uniform reference is undefined.")
+
+    frame = data[[by, value_col]].sort_values([by, value_col])
+    keys, values = frame[by].to_numpy(), frame[value_col].to_numpy()
+    cdf = (values - lo) / (hi - lo)
+
+    size = frame.groupby(by)[value_col].transform("size").to_numpy()
+    rank = frame.groupby(by).cumcount().to_numpy()
+    # Empirical CDF just below and at each value; tied values share their block's outer edges
+    below, at = rank / size, (rank + 1) / size
+    block = np.cumsum(np.r_[True, (keys[1:] != keys[:-1]) | (values[1:] != values[:-1])]) - 1
+    below = pd.Series(below).groupby(block).transform("min").to_numpy()
+    at = pd.Series(at).groupby(block).transform("max").to_numpy()
+
+    distance = np.maximum(at - cdf, cdf - below)
+    return pd.Series(distance).groupby(keys).max().rename_axis(by)
+
+
 def dataset_ks(
     data: pd.DataFrame,
     user_col: str = "user_id",
@@ -144,31 +175,9 @@ def dataset_ks(
     """Entity-wise Kolmogorov-Smirnov uniformity statistic ``D_KS^D`` of a dataset (paper, Eq. 6).
 
     For every user and item, computes the KS distance between its observed values and a uniform
-    distribution over ``[min(r), max(r)]``, then averages over all users and items together. Higher values
-    mean entities concentrate their values, which tempts models into predicting the DMV and induces
-    eccentricity bias.
+    distribution over ``[min(r), max(r)]`` (see :func:`entity_ks`), then averages over all users and items
+    together. Higher values mean entities concentrate their values, which tempts models into predicting
+    the DMV and induces eccentricity bias.
     """
-    _check_columns(data, [user_col, item_col, value_col], "data")
-    lo, hi = data[value_col].min(), data[value_col].max()
-    if hi == lo:
-        raise ValueError("All observed values are identical; the uniform reference is undefined.")
-
-    def per_entity(key: str) -> np.ndarray:
-        frame = data[[key, value_col]].sort_values([key, value_col])
-        cdf = ((frame[value_col] - lo) / (hi - lo)).to_numpy()
-        n = frame.groupby(key)[value_col].transform("size").to_numpy()
-        # Empirical CDF edges of every sorted value; tied values share the block's outer edges
-        rank = frame.groupby(key).cumcount().to_numpy()
-        upper = (rank + 1) / n
-        lower = rank / n
-        vals = frame[value_col].to_numpy()
-        keys = frame[key].to_numpy()
-        new_block = np.r_[True, (keys[1:] != keys[:-1]) | (vals[1:] != vals[:-1])]
-        block_id = np.cumsum(new_block) - 1
-        block_last = pd.Series(upper).groupby(block_id).transform("max").to_numpy()
-        block_first = pd.Series(lower).groupby(block_id).transform("min").to_numpy()
-        d = np.maximum(block_last - cdf, cdf - block_first)
-        return pd.Series(d).groupby(keys).max().to_numpy()
-
-    stats = np.concatenate([per_entity(user_col), per_entity(item_col)])
+    stats = np.concatenate([entity_ks(data, user_col, value_col), entity_ks(data, item_col, value_col)])
     return float(stats.mean())

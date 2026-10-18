@@ -3,8 +3,8 @@ import dgl.function as fn
 import dgl.nn.pytorch as dglnn
 import torch as th
 import torch.nn as nn
+from dgl.base import DGLError
 from torch.nn import init
-
 from utils import get_activation, to_etype_name
 
 

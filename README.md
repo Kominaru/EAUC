@@ -32,6 +32,7 @@ git clone https://github.com/Kominaru/EAUC.git
 cd EAUC
 pip install -e .          # numpy, pandas, scikit-learn, scipy
 pip install -e ".[plot]"  # optionally, matplotlib for the plotting options
+pip install -e ".[experiments]"  # optionally, what the paper scripts in experiments/ need on top
 ```
 
 ## Quickstart
@@ -54,13 +55,13 @@ print(dataset_ks(pd.concat([train, test])))       # how prone the dataset is to 
 
 | Path | Contents |
 |---|---|
-| `eauc/` | The Python package: metric (`metrics.py`), post-hoc corrections (`correction.py`), command line (`cli.py`) |
-| `tests/` | Tests of the metric, the corrections and the command line (`pytest`) |
+| `eauc/` | The Python package: metric and curves (`metrics.py`), post-hoc corrections (`correction.py`), dataset loaders (`datasets.py`), prediction files (`io.py`), command line (`cli.py`) |
+| `tests/` | Tests of the library and its command line (`pytest`) |
 | `examples/synthetic_example.py` | End-to-end example on synthetic data |
-| `models/` | Model wrappers used in the paper: MF, GC-MC, GLocal-K, Bayesian SVD++, MRMA and trivial baselines |
-| `src/` | Analysis and figure scripts of the paper experiments (`avg_bias_auc_analysis.py`, `regression_corrector.py`, `dataset_complexity_measure.py`, `figure_scripts/`) |
+| `models/` | Model scripts of the paper: MF (`MF/`), GC-MC (`GCMC/`), GLocal-K (`GLOCAL_K/`) and Bayesian SVD++ (`BAYESIAN_SVD++/`). Each saves its predictions under `outputs/` |
+| `experiments/` | Scripts of the paper analyses: `eccentricity_analysis.py` (RMSE, MAE, EAUC and error curves), `post_hoc_correction.py`, `dataset_difficulty.py` and `case_studies.py` |
 | `download_data.py` | Downloads the public datasets (`python download_data.py ml-1m`) |
-| `envs_requirements/` | Pinned environments of the model wrappers used in the paper |
+| `envs_requirements/` | Pinned environments of the MF and GLocal-K scripts used in the paper |
 
 ## Citation
 
